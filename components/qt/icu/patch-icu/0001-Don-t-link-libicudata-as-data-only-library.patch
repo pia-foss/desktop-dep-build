@@ -1,0 +1,28 @@
+From e28229ec7700849619bd1c3a3d1bc90197888aeb Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jonathon@privateinternetaccess.com>
+Date: Fri, 21 Aug 2020 13:46:34 -0400
+Subject: [PATCH] Don't link libicudata as data-only library
+
+---
+ icu4c/source/config/mh-linux | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/icu4c/source/config/mh-linux b/icu4c/source/config/mh-linux
+index 53d6780d68..db45b2326f 100644
+--- a/icu4c/source/config/mh-linux
++++ b/icu4c/source/config/mh-linux
+@@ -23,7 +23,10 @@ LD_RPATH= -Wl,-zorigin,-rpath,'$$'ORIGIN
+ LD_RPATH_PRE = -Wl,-rpath,
+ 
+ ## These are the library specific LDFLAGS
+-LDFLAGSICUDT=-nodefaultlibs -nostdlib
++#LDFLAGSICUDT=-nodefaultlibs -nostdlib
++# Linking libicudata as data-only causes problems on armhf, it'll be
++# marked as soft-float ABI since it contains no functions.
++LDFLAGSICUDT=
+ 
+ ## Compiler switch to embed a library name
+ # The initial tab in the next line is to prevent icu-config from reading it.
+-- 
+2.20.1
+

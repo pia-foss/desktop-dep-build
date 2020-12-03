@@ -1,0 +1,26 @@
+From 1e7c9654461a5161f0e036edef0955858582d865 Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jonathon@privateinternetaccess.com>
+Date: Wed, 19 Aug 2020 20:21:34 +0000
+Subject: [PATCH 2/2] Fix linux-aarch64 detection when gcc -dumpmachine says
+ aarch64-linux-gnu
+
+---
+ generic/gentoo.config-0.9.8 | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/generic/gentoo.config-0.9.8 b/generic/gentoo.config-0.9.8
+index e5d41bf..aa9bb41 100755
+--- a/generic/gentoo.config-0.9.8
++++ b/generic/gentoo.config-0.9.8
+@@ -63,7 +63,7 @@ fi
+ case "${CHOST}" in
+ 	i*86-*-mingw*|i*86-mingw*|mingw*)	system="mingw";;
+ 	x86_64-*-mingw*)	system="mingw64";;
+-	aarch64-*-linux-*)	system="linux-aarch64";;
++	aarch64-*linux-*)	system="linux-aarch64";;
+ 	*-linux*)		system="linux";;
+ 	*-freebsd*)		system="BSD";;
+ 	*-solaris*)
+-- 
+2.25.1
+

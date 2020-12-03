@@ -1,0 +1,7 @@
+out/
+build.tmp/
+.DS_Store
+.deps/
+build/
+*.kdev4
+*.kate-swp

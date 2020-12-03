@@ -1,0 +1,34 @@
+From 03edac64d59e826b4828a78429be2f4ce8c0af27 Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jhall@londontrustmedia.com>
+Date: Thu, 21 Mar 2019 10:04:35 -0400
+Subject: [PATCH 3/5] Build OpenSSL with correct install prefix
+
+---
+ msvc/build.bat | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/msvc/build.bat b/msvc/build.bat
+index 59441be..672ef54 100644
+--- a/msvc/build.bat
++++ b/msvc/build.bat
+@@ -124,9 +124,15 @@ if errorlevel 1 goto error
+ echo Build OpenSSL
+ 
+ cd build.tmp\openssl*
+-perl Configure %OPENSSL_ARCH% --prefix="%TARGET%" --openssldir="%TARGET%"\ssl
++perl Configure %OPENSSL_ARCH% --prefix="%TARGET%" --openssldir="%OPENSSL_DIR%"
+ if errorlevel 1 goto error
+-nmake install
++
++rem Skip the install_ssldirs target (one of the deps of install), since it tries
++rem to install config to OPENSSLDIR.  That directory doesn't exist at build
++rem time, and we don't care about those config files.
++rem
++rem 'install_sw' and 'install_docs' are the other deps of 'install'.
++nmake install_sw install_docs
+ if errorlevel 1 goto error
+ 
+ if not exist "%TARGET%\libeay32.lib" (
+-- 
+2.23.0.windows.1
+

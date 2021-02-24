@@ -17,6 +17,72 @@ This repository is used to build PIA Desktop 2.6.1-beta.1, and the separate repo
 * Previous WireGuard and WinTUN build: https://github.com/pia-foss/desktop-wireguard
 >>>
 
+# Windows
+
+On Windows, some components build natively using MSVC, while other components build in a MinGW environment.  The Windows build is divided into two parts.
+
+> :point_right: *Important:* Notes on cloning this repo:
+> * Clone with MinGW's git if you plan on building MinGW components.  (Line endings are handled differently.)
+>   * Native components can usually be built from a MinGW clone too, but if you encounter any issues, make a second clone with Git for Windows for native components.
+> * Put this repo as close to the filesystem root as possible, such as `C:\wkspc\desktop-dep-build\`.  Some Qt file paths exceed 200 characters and can easily run into file path length limits of Windows or MSVC.
+>   * If you get errors from 7z.exe or cl.exe indicating that files can't be opened, this is usually the cause.
+
+## Natively built components
+
+This includes OpenVPN (as well as its dependencies, such as OpenSSL) and WireGuard (both the service and WinTUN driver package).
+
+You will need:
+
+* Visual Studio 2019 (any version - build tools is sufficient)
+  * Windows SDK 10.0.17763.0 - OpenVPN is currently configured for this specific version of the SDK
+  * ATL/MFC - Qt indirectly references atlbase.h
+  * If building on arm64, also get the arm64 compiler, ATL, and MFC from "Individual components"
+* Perl, one of:
+  * Strawberry Perl: http://strawberryperl.com/releases.html
+  * ActiveState Perl: https://www.activestate.com/products/perl/downloads/
+* NASM: https://www.nasm.us
+* 7-zip: https://7-zip.org/
+* Python: https://www.python.org/downloads/
+  * Add Python to PATH in the installer
+* For WinTUN:
+  * the brand file used to build PIA (the WinTUN artifact is brand-specific)
+  * a SHA256 code-signing certificate (to sign the WinTUN driver package, does not need to be an EV cert)
+  * signtool.exe (scripts will find it from the Windows SDK by default)
+
+To build:
+
+```
+> set PIA_SIGN_SHA256_CERT=<cert_thumbprint>
+> build-windows.bat <...path...>\pia_desktop pia
+```
+
+The `pia_desktop` repo and brand code (`pia` in the example) are used to find the brand JSON file.
+
+This produces artifacts for all supported Windows architectures.
+
+## MinGW-built components
+
+This includes shadowsocks, unbound, and hnsd. (hnsd is no longer supported in PIA but still part of the build for now).
+
+1. Install MSYS2 from https://www.msys2.org - follow the instructions on that page
+2. Install dependencies
+  - You do need to install git in MSYS2, even if you have Git for Windows; it is needed for the submodules.
+  - You do not need libunbound as listed in the hnsd readme, it's built from source.
+  - All builds: `pacman -S base-devel patch git mingw-w64-x86_64-git-lfs`
+  - x86_64 builds: `pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-crt-git`
+  - x86 builds: `pacman -S mingw-w64-i686-toolchain mingw-w64-i686-crt-git`
+  - If prompted by pacman for group members, accept defaults (all members in group)
+3. Set up Git LFS before cloning this repo: `git lfs install`
+4. Make sure you are building from a copy of `desktop-dep-build` cloned by MSYS2.  (Git for Windows handles line endings differently and will cause issues.)
+
+To build:
+
+```
+./build-mingw.sh
+```
+
+Build once from the MinGW 64-bit shell to produce 64-bit artifacts, and once from the MinGW 32-bit shell to produce 32-bit artifacts.
+
 # Linux
 
 ## Build environment
@@ -51,7 +117,7 @@ $ ./build-linux.sh
 You will need the following build dependencies (see individual component READMEs for details):
 
 ```
-build-essential curl pv bison git automake libtool libmnl-dev python2 libclang-dev libssl-dev libxcb-xinerama0-dev libxcb-render0-dev libxcb-render-util0-dev libxcb-shape0-dev libxcb-randr0-dev libxcb-xfixes0-dev libxcb-sync-dev libxcb-shm0-dev libxcb-icccm4-dev libxcb-keysyms1-dev libxcb-image0-dev libxkbcommon-x11-dev libxi-dev libxrender-dev libxext-dev libx11-dev libx11-xcb-dev libxcb1-dev libfontconfig1-dev libfreetype6-dev libsm-dev libice-dev libglib2.0-dev libpq-dev libatspi2.0-dev libglvnd-dev
+build-essential curl pv bison git automake libtool libmnl-dev python2 libclang-dev libssl-dev libxkbcommon-x11-dev libxi-dev libxrender-dev libxext-dev libx11-dev libx11-xcb-dev libfontconfig1-dev libfreetype6-dev libsm-dev libice-dev libglib2.0-dev libpq-dev libatspi2.0-dev libglvnd-dev
 ```
 
 Notes:
@@ -64,7 +130,7 @@ Notes:
 Build with:
 
 ```
-./build-linux.sh
+./build-posix.sh
 ```
 
 Artifacts are produced in `out/artifacts`.

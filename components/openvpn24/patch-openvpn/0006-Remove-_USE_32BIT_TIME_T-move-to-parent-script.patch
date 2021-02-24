@@ -1,4 +1,4 @@
-From 9e36549e3fffe090af5f0821b947b3054b2ed0fe Mon Sep 17 00:00:00 2001
+From 3b03e9793b7d8e168a387d06ccc873e890f7ec85 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 8 Mar 2019 01:35:22 +0900
 Subject: [PATCH 06/12] Remove _USE_32BIT_TIME_T (move to parent script)
@@ -20,5 +20,5 @@ index aabed750..56b469f4 100644
  
  if exist config-msvc-local.h set CPPFLAGS="%CPPFLAGS%;HAVE_CONFIG_MSVC_LOCAL_H"
 -- 
-2.23.0.windows.1
+2.11.0
 

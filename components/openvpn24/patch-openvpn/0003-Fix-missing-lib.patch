@@ -1,4 +1,4 @@
-From 6fd1b4ae52e593abea7f64cb4a1f78406056a59c Mon Sep 17 00:00:00 2001
+From 6944f3f3448cbbb165326cd2ad67da710dee708d Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Wed, 6 Mar 2019 02:39:48 +0900
 Subject: [PATCH 03/12] Fix missing lib
@@ -30,5 +30,5 @@ index db00bbe7..1846ad7e 100644
        <GenerateDebugInformation>true</GenerateDebugInformation>
        <SubSystem>Console</SubSystem>
 -- 
-2.23.0.windows.1
+2.11.0
 

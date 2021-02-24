@@ -1,4 +1,4 @@
-From 5bf0bc1d57876d927eeaf2504820d939350ae515 Mon Sep 17 00:00:00 2001
+From 281119930e72253491f091589be9a964d73cd106 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Wed, 15 Jan 2020 21:39:28 -0500
 Subject: [PATCH 12/12] Enable EC crypto on Windows
@@ -20,5 +20,5 @@ index 3fdb73cb..b4d76b03 100644
  
  #define PATH_SEPARATOR     '\\'
 -- 
-2.23.0.windows.1
+2.11.0
 

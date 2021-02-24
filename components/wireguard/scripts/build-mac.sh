@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) 2020 Private Internet Access, Inc.
+# Copyright (c) 2021 Private Internet Access, Inc.
 #
 # This file is part of the Private Internet Access Desktop Client.
 #
@@ -41,5 +41,6 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 
 cd "$ROOT/wireguard-go/" || exit
+[ -e wireguard-go ] && rm wireguard-go
 make
 cp "$ROOT/wireguard-go/wireguard-go" "$OUT/wireguard-go"

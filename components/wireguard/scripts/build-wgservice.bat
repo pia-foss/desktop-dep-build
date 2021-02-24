@@ -54,9 +54,7 @@ if exist %DEPS%\prepared goto :build
 	set GOROOT=%DEPS%\go
 	set CGO_ENABLED=1
 	set CGO_CFLAGS=-O3 -Wall -Wno-unused-function -Wno-switch -std=gnu11 -DWINVER=0x0601
-	set CGO_LDFLAGS=-Wl,--dynamicbase -Wl,--nxcompat -Wl,--export-all-symbols
 	call :build_plat x86 i686 386 || goto :error
-	set CGO_LDFLAGS=%CGO_LDFLAGS% -Wl,--high-entropy-va
 	call :build_plat x86_64 x86_64 amd64 || goto :error
   goto :success
 
@@ -72,7 +70,7 @@ if exist %DEPS%\prepared goto :build
 	goto :eof
 
 :build_plat
-  set PATH=%DEPS%\go\bin;%DEPS%\%~2-w64-mingw32-native\bin;%PATH
+  set PATH=%DEPS%\go\bin;%DEPS%\%~2-w64-mingw32-native\bin;%PATH%
 	set CC=%~2-w64-mingw32-gcc
 	set GOARCH=%~3
 	mkdir %1 >NUL 2>&1

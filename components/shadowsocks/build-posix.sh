@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# Copyright (c) 2020 Private Internet Access, Inc.
+# Copyright (c) 2021 Private Internet Access, Inc.
 #
 # This file is part of the Private Internet Access Desktop Client.
 #
@@ -166,10 +166,10 @@ SHADOWSOCKS_WITH_ARGS=()
 echo "Building libpcre..."
 mkdir -p "${build_dir}/libpcre"
 pushd "${build_dir}/libpcre"
-if [ -z "${REBUILD}" ] || [ ! -d "./pcre-8.43" ]; then
-    tar xvzf "${__dir}/deps/pcre-8.43.tar.gz"
+if [ -z "${REBUILD}" ] || [ ! -d "./pcre-8.44" ]; then
+    tar xvzf "${__dir}/deps/pcre-8.44.tar.gz"
 fi
-cd ./pcre-8.43
+cd ./pcre-8.44
 ./configure --prefix="${output_dir}/libpcre" --disable-shared "${FLAGS_ARGS[@]}" "${LIBPCRE_CONF_ARGS[@]}"
 make "${ALL_MAKE_ARGS[@]}"
 make install

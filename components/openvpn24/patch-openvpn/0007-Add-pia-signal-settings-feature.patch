@@ -1,4 +1,4 @@
-From df3027be0e772cf99c977241602240e258449c0f Mon Sep 17 00:00:00 2001
+From e94d9084448f5ada0c072db726ef71f98c9d958d Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 8 Mar 2019 03:02:15 +0900
 Subject: [PATCH 07/12] Add --pia-signal-settings feature
@@ -11,16 +11,16 @@ Subject: [PATCH 07/12] Add --pia-signal-settings feature
  src/openvpn/ssl.c         | 12 ++++++++++++
  src/openvpn/ssl_backend.h | 13 +++++++++++++
  src/openvpn/ssl_common.h  |  2 ++
- src/openvpn/ssl_openssl.c | 35 +++++++++++++++++++++++++++++++++++
+ src/openvpn/ssl_openssl.c | 36 ++++++++++++++++++++++++++++++++++++
  src/openvpn/ssl_openssl.h |  2 ++
- 9 files changed, 110 insertions(+)
+ 9 files changed, 111 insertions(+)
  create mode 100644 src/openvpn/pia-inline.h
 
 diff --git a/src/openvpn/init.c b/src/openvpn/init.c
-index d3785cab..aa79b527 100644
+index 34d830a3..1e9e710b 100644
 --- a/src/openvpn/init.c
 +++ b/src/openvpn/init.c
-@@ -2853,6 +2853,11 @@ do_init_crypto_tls(struct context *c, const unsigned int flags)
+@@ -2876,6 +2876,11 @@ do_init_crypto_tls(struct context *c, const unsigned int flags)
          tls_crypt_adjust_frame_parameters(&to.frame);
      }
  
@@ -33,7 +33,7 @@ index d3785cab..aa79b527 100644
       * length prefix */
      socket_adjust_frame_parameters(&to.frame, options->ce.proto);
 diff --git a/src/openvpn/options.c b/src/openvpn/options.c
-index de30fcb0..31b74156 100644
+index 192c6725..41718ec8 100644
 --- a/src/openvpn/options.c
 +++ b/src/openvpn/options.c
 @@ -903,6 +903,7 @@ init_options(struct options *o, const bool init_gc)
@@ -44,7 +44,7 @@ index de30fcb0..31b74156 100644
  }
  
  void
-@@ -7512,6 +7513,11 @@ add_option(struct options *options,
+@@ -7525,6 +7526,11 @@ add_option(struct options *options,
          VERIFY_PERMISSION(OPT_P_GENERAL|OPT_P_INSTANCE);
          options->ncp_enabled = false;
      }
@@ -109,7 +109,7 @@ index 00000000..e04d6898
 +    buf_write(buf, settings_msg, len);
 +}
 diff --git a/src/openvpn/ssl.c b/src/openvpn/ssl.c
-index 9696e9ba..087dc30e 100644
+index f98799ed..b1635abc 100644
 --- a/src/openvpn/ssl.c
 +++ b/src/openvpn/ssl.c
 @@ -64,6 +64,8 @@
@@ -121,7 +121,7 @@ index 9696e9ba..087dc30e 100644
  #ifndef ENABLE_OCC
  static const char ssl_default_options_string[] = "V0 UNDEF";
  #endif
-@@ -624,6 +626,11 @@ init_ssl(const struct options *options, struct tls_root_ctx *new_ctx)
+@@ -622,6 +624,11 @@ init_ssl(const struct options *options, struct tls_root_ctx *new_ctx)
          tls_ctx_client_new(new_ctx);
      }
  
@@ -133,7 +133,7 @@ index 9696e9ba..087dc30e 100644
      /* Restrict allowed certificate crypto algorithms */
      tls_ctx_set_cert_profile(new_ctx, options->tls_cert_profile);
  
-@@ -2799,6 +2806,11 @@ tls_process(struct tls_multi *multi,
+@@ -2834,6 +2841,11 @@ tls_process(struct tls_multi *multi,
                  ks->must_negotiate = now + session->opt->handshake_window;
                  ks->auth_deferred_expire = now + auth_deferred_expire_window(session->opt);
  
@@ -149,38 +149,38 @@ diff --git a/src/openvpn/ssl_backend.h b/src/openvpn/ssl_backend.h
 index c614efa6..e56aaf42 100644
 --- a/src/openvpn/ssl_backend.h
 +++ b/src/openvpn/ssl_backend.h
-@@ -157,6 +157,13 @@ void tls_ctx_free(struct tls_root_ctx *ctx);
-  */
+@@ -158,6 +158,13 @@ void tls_ctx_free(struct tls_root_ctx *ctx);
  bool tls_ctx_initialised(struct tls_root_ctx *ctx);
  
-+/**
+ /**
 + * Enable PIA signal settings mode.
 + *
 + * @param ctx           TLS context to set flag on
 + */
 +void tls_ctx_set_pia_signal_settings(struct tls_root_ctx *ctx);
 +
- /**
++/**
   * Set any library specific options.
   *
-@@ -321,6 +328,12 @@ void tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
-                      const char *ca_file_inline, const char *ca_path, bool tls_server
+  * Examples include disabling session caching, the password callback to use,
+@@ -322,6 +329,12 @@ void tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
                       );
  
-+/**
+ /**
 + * Get the MD5 digest hex string for the first configured certificate authority.
 + * If there is no configured CA, returns NULL.
 + */
 +const char *tls_ctx_get_pia_first_ca_digest(struct tls_root_ctx *ctx);
 +
- /**
++/**
   * Load extra certificate authority certificates from the given file or path.
   * These Load extra certificates that are part of our own certificate
+  * chain but shouldn't be included in the verify chain.
 diff --git a/src/openvpn/ssl_common.h b/src/openvpn/ssl_common.h
-index ac25ffa7..306a90a2 100644
+index 378b81fd..93a2944b 100644
 --- a/src/openvpn/ssl_common.h
 +++ b/src/openvpn/ssl_common.h
-@@ -345,6 +345,8 @@ struct tls_options
+@@ -346,6 +346,8 @@ struct tls_options
      const char *ekm_label;
      size_t ekm_label_size;
      size_t ekm_size;
@@ -190,12 +190,12 @@ index ac25ffa7..306a90a2 100644
  
  /** @addtogroup control_processor
 diff --git a/src/openvpn/ssl_openssl.c b/src/openvpn/ssl_openssl.c
-index 6aa3ac34..950eedfa 100644
+index ff71b9c4..b5705d7f 100644
 --- a/src/openvpn/ssl_openssl.c
 +++ b/src/openvpn/ssl_openssl.c
-@@ -110,6 +110,9 @@ tls_ctx_server_new(struct tls_root_ctx *ctx)
-     {
-         crypto_msg(M_FATAL, "SSL_CTX_new SSLv23_server_method");
+@@ -115,6 +115,9 @@ tls_ctx_server_new(struct tls_root_ctx *ctx)
+         crypto_msg(M_WARN, "Warning: TLS server context initialisation "
+                    "has warnings.");
      }
 +
 +    ctx->pia_signal_settings = false;
@@ -203,9 +203,9 @@ index 6aa3ac34..950eedfa 100644
  }
  
  void
-@@ -123,6 +126,9 @@ tls_ctx_client_new(struct tls_root_ctx *ctx)
-     {
-         crypto_msg(M_FATAL, "SSL_CTX_new SSLv23_client_method");
+@@ -133,6 +136,9 @@ tls_ctx_client_new(struct tls_root_ctx *ctx)
+         crypto_msg(M_WARN, "Warning: TLS client context initialisation "
+                    "has warnings.");
      }
 +
 +    ctx->pia_signal_settings = false;
@@ -213,11 +213,10 @@ index 6aa3ac34..950eedfa 100644
  }
  
  void
-@@ -143,6 +149,19 @@ tls_ctx_initialised(struct tls_root_ctx *ctx)
-     return NULL != ctx->ctx;
+@@ -154,6 +160,19 @@ tls_ctx_initialised(struct tls_root_ctx *ctx)
  }
  
-+void
+ void
 +tls_ctx_set_pia_signal_settings(struct tls_root_ctx *ctx)
 +{
 +    ctx->pia_signal_settings = true;
@@ -230,10 +229,11 @@ index 6aa3ac34..950eedfa 100644
 +#endif
 +}
 +
- void
++void
  key_state_export_keying_material(struct key_state_ssl *ssl,
                                   struct tls_session *session)
-@@ -1319,6 +1338,16 @@ tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
+ {
+@@ -1360,6 +1379,17 @@ tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
                      X509_STORE_add_cert(store, info->x509);
                      added++;
  
@@ -247,10 +247,11 @@ index 6aa3ac34..950eedfa 100644
 +                        }
 +                    }
 +
++
                      if (!tls_server)
                      {
                          continue;
-@@ -1413,6 +1442,12 @@ tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
+@@ -1454,6 +1484,12 @@ tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
      }
  }
  
@@ -277,5 +278,5 @@ index dabb9412..c79e45ad 100644
  
  struct key_state_ssl {
 -- 
-2.23.0.windows.1
+2.11.0
 

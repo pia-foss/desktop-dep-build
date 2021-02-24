@@ -26,11 +26,11 @@ case "$(uname)" in
         ARCH=x86_64
         ;;
     MINGW64_NT*)
-        PLATFORM=windows
+        PLATFORM=mingw64
         ARCH=x86_64
         ;;
     MINGW32_NT*)
-        PLATFORM=windows
+        PLATFORM=mingw32
         ARCH=x86
         ;;
     *)
@@ -40,7 +40,7 @@ esac
 
 function select_platform() {
     case "$PLATFORM" in
-        windows)
+        mingw*)
             echo "$1"
             ;;
         macos)

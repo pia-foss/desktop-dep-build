@@ -1,4 +1,4 @@
-From ef7ebd3eb4a78a102f69028df412a5fd4c393138 Mon Sep 17 00:00:00 2001
+From fddb67bc3c62ccb60706f0b40fae3c083af5d465 Mon Sep 17 00:00:00 2001
 From: Lev Stipakov <lstipakov@gmail.com>
 Date: Thu, 17 Oct 2019 15:23:43 +0300
 Subject: [PATCH 01/12] msvc: OpenSSL 1.1.x support
@@ -93,5 +93,5 @@ index d1c0fdec..db00bbe7 100644
        <GenerateDebugInformation>true</GenerateDebugInformation>
        <SubSystem>Console</SubSystem>
 -- 
-2.23.0.windows.1
+2.11.0
 

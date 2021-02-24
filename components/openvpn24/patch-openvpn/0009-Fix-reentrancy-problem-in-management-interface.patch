@@ -1,4 +1,4 @@
-From 0f2744242efcbf5798c7f7e701c42b4584698143 Mon Sep 17 00:00:00 2001
+From 736e3e42a2fa587147067e44f79dec39efff581e Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 8 Mar 2019 03:03:17 +0900
 Subject: [PATCH 09/12] Fix reentrancy problem in management interface
@@ -8,7 +8,7 @@ Subject: [PATCH 09/12] Fix reentrancy problem in management interface
  1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/src/openvpn/manage.c b/src/openvpn/manage.c
-index 61d61ef2..3cf6afb8 100644
+index 6d1bdc10..00bdfe49 100644
 --- a/src/openvpn/manage.c
 +++ b/src/openvpn/manage.c
 @@ -3081,7 +3081,7 @@ management_io(struct management *man)
@@ -32,5 +32,5 @@ index 61d61ef2..3cf6afb8 100644
                  {
                      int status;
 -- 
-2.23.0.windows.1
+2.11.0
 

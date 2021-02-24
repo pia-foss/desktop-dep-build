@@ -1,0 +1,6 @@
+;!@Install@!UTF-8!
+Title="Qt {{QT_VERSION}} - Private Internet Access"
+BeginPrompt="Install to C:\Qt{{QT_VERSION}}-pia\{{QT_VERSION}}\{{QT_BUILD_NAME}}? (Any existing contents will be deleted.)"
+ExecuteFile="cmd.exe"
+ExecuteParameters="/c \"\"win_install.bat\""
+;!@InstallEnd@!

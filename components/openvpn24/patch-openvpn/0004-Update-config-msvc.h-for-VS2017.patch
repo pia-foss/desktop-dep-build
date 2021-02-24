@@ -1,4 +1,4 @@
-From f4b5a547e5ff953379947bf8797ed927f43c5226 Mon Sep 17 00:00:00 2001
+From 443473456da77d7f9b8fe23adc898886ee48cd18 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Thu, 7 Mar 2019 17:08:24 +0900
 Subject: [PATCH 04/12] Update config-msvc.h for VS2017
@@ -20,5 +20,5 @@ index 836068dd..0381b7cc 100644
  #define HAVE_ACCESS 1
  #define HAVE_CHDIR 1
 -- 
-2.23.0.windows.1
+2.11.0
 

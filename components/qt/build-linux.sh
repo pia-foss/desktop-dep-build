@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# Copyright (c) 2020 Private Internet Access, Inc.
+# Copyright (c) 2021 Private Internet Access, Inc.
 #
 # This file is part of the Private Internet Access Desktop Client.
 #
@@ -20,7 +20,7 @@
 
 QT_MAJOR=5
 QT_MINOR=15
-QT_PATCH=0
+QT_PATCH=2
 
 QT_VERSION="$QT_MAJOR.$QT_MINOR.$QT_PATCH"
 # Disk space required to build Qt (approximate).  The out/ directory has
@@ -175,7 +175,7 @@ if [ -z "$SKIP_CLEAN" ]; then
     # Verify the source archive
     echo "Verifying Qt $QT_SOURCE_ARCHIVE"
     QT_SOURCE_ACTUAL="$(pv "$QT_SOURCE_ARCHIVE" | sha256sum | awk '{print $1}')"
-    QT_SOURCE_EXPECTED="22b63d7a7a45183865cc4141124f12b673e7a17b1fe2b91e433f6547c5d548c3"
+    QT_SOURCE_EXPECTED="3a530d1b243b5dec00bc54937455471aaa3e56849d2593edb8ded07228202240"
 
     if [ "$QT_SOURCE_ACTUAL" != "$QT_SOURCE_EXPECTED" ]; then
         echo "Qt source archive does not match expected hash:" >&2

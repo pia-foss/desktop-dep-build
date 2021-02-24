@@ -1,4 +1,4 @@
-From 6259630809d37c2266d60e12a118b0bfb4dd763c Mon Sep 17 00:00:00 2001
+From bb40109dc8f98c05726760ca370caa0f7b69c57a Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 22 Mar 2019 09:21:21 -0400
 Subject: [PATCH 11/12] Enable AEAD ciphers (AES-*-GCM) on Windows
@@ -20,5 +20,5 @@ index 0381b7cc..3fdb73cb 100644
  #define ENABLE_EUREPHIA 1
  #define ENABLE_FRAGMENT 1
 -- 
-2.23.0.windows.1
+2.11.0
 

@@ -1,14 +1,14 @@
-From 806936a3ba25279559ecea2361f58420963c0e87 Mon Sep 17 00:00:00 2001
+From 3e5ea60c9158d9c85664e57af8672e7fb914c709 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Thu, 7 Mar 2019 22:53:45 +0900
 Subject: [PATCH 05/12] Add x64 targets
 
 ---
- .../msvc/msvc-generate/msvc-generate.vcxproj  | 38 +++++++++
- openvpn.sln                                   | 18 +++++
- src/compat/compat.vcxproj                     | 54 +++++++++++++
- src/openvpn/openvpn.vcxproj                   | 78 +++++++++++++++++++
- src/openvpnserv/openvpnserv.vcxproj           | 73 +++++++++++++++++
+ build/msvc/msvc-generate/msvc-generate.vcxproj | 38 +++++++++++++
+ openvpn.sln                                    | 18 ++++++
+ src/compat/compat.vcxproj                      | 54 ++++++++++++++++++
+ src/openvpn/openvpn.vcxproj                    | 78 ++++++++++++++++++++++++++
+ src/openvpnserv/openvpnserv.vcxproj            | 73 ++++++++++++++++++++++++
  5 files changed, 261 insertions(+)
 
 diff --git a/build/msvc/msvc-generate/msvc-generate.vcxproj b/build/msvc/msvc-generate/msvc-generate.vcxproj
@@ -538,5 +538,5 @@ index 1224fbf5..11f8e1ad 100644
      <ClCompile Include="..\openvpn\block_dns.c" />
      <ClCompile Include="automatic.c" />
 -- 
-2.23.0.windows.1
+2.11.0
 

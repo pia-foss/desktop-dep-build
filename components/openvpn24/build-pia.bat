@@ -1,4 +1,4 @@
-rem Copyright (c) 2020 Private Internet Access, Inc.
+rem Copyright (c) 2021 Private Internet Access, Inc.
 rem
 rem This file is part of the Private Internet Access Desktop Client.
 rem
@@ -27,7 +27,7 @@ set SDKVERSION=10.0.17763.0
 set OPENSSL_VERSION=1.1.1g
 set LZO_VERSION=2.10
 
-set CPPFLAGS_32=%CPPFLAGS%;-D"_USE_32BIT_TIME_T"
+set CPPFLAGS_32=%CPPFLAGS% -D_USE_32BIT_TIME_T
 set CPPFLAGS_64=%CPPFLAGS%
 rem These paths are relative to the .\build.tmp\openvpn-build\msvc directory
 set OUT_32=..\..\..\out\artifacts\x86
@@ -138,15 +138,16 @@ rem Move to openvpn-build to run build.bat
 pushd .\build.tmp\openvpn-build\msvc
 
 for %%G in (32 64) do (
-    set BITS=%%G
+    set ARCH=%%G
     set CPPFLAGS=!CPPFLAGS_%%G!
     echo.
-    echo * Building !BITS!-bit OpenVPN binaries...
+    echo * Building !ARCH!-bit OpenVPN binaries...
     echo.
     call build.bat
+    echo "build.bat finished: !errorlevel!"
     if !errorlevel! neq 0 goto error
     mkdir !OUT_%%G!
-    xcopy image\bin "!OUT_%%G!" /Q /E /I /Y
+    xcopy image%%G\bin "!OUT_%%G!" /Q /E /I /Y
     del /F "!OUT_%%G!\openssl.exe" "!OUT_%%G!\openvpnserv.exe"
     rename "!OUT_%%G!\openvpn.exe" "pia-openvpn.exe"
 )

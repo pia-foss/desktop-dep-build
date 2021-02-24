@@ -1,4 +1,4 @@
-From 872b9f67bdf987e9394b698d4a97e284a3a0256b Mon Sep 17 00:00:00 2001
+From 91bccdc4c7f3a67586c5188f35d5435160b3a699 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 8 Mar 2019 03:02:48 +0900
 Subject: [PATCH 08/12] Disable non-blocking connect
@@ -26,5 +26,5 @@ index 3ac9d70c..baeb43df 100644
  /*
   * Do we have the capability to support the AUTO_USERID feature?
 -- 
-2.23.0.windows.1
+2.11.0
 

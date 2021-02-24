@@ -1,0 +1,36 @@
+From 4ee83706eaa0e103f1950ac63a6b05f1024af474 Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jonathon@privateinternetaccess.com>
+Date: Fri, 15 Jan 2021 14:19:46 -0500
+Subject: [PATCH 3/3] Fix build command in build.bat
+
+---
+ msvc/build.bat | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/msvc/build.bat b/msvc/build.bat
+index 9a71868..2cb98e7 100644
+--- a/msvc/build.bat
++++ b/msvc/build.bat
+@@ -189,7 +189,16 @@ xcopy * ..\..\..\..\%OPENVPN_BUILD_OPENVPN% /E
+ cd ..\..\..\..\%OPENVPN_BUILD_OPENVPN%
+
+-if %ARCH%==32 ( SET PLAT=Win32 ) else ( SET PLAT=x64 )
++if %ARCH%==32 (SET PLAT=Win32) else (SET PLAT=x64)
+-msbuild openvpn.sln /p:Platform=%PLAT% /p:Configuration=%RELEASE%
++rem The upstream script calls msbuild directly here, but it needs environment
++rem variables that are set up by msvc-build.bat and msvc-env.bat [notably
++rem SOURCEBASE], call msvc-build.bat instead.  [note that this is also patch by
++rem a patch on OpenVPN to allow us to set the platform, configuration, etc.]
++rem msbuild openvpn.sln /p:Platform=%PLAT% /p:Configuration=%RELEASE%
++set OPENVPN_DEPROOT=%TARGET%
++set PLATFORMS=%PLAT%
++set CONFIGURATIONS=%RELEASE%
++call msvc-build.bat
+ if errorlevel 1 goto error
+-copy x64-Output\%RELEASE%\*.exe "%TARGET%\bin"
++echo "copying %PLAT%-Output\%RELEASE%\*.exe"
++copy %PLAT%-Output\%RELEASE%\*.exe "%TARGET%\bin"
+ if errorlevel 1 goto error
+--
+2.23.0.windows.1
+

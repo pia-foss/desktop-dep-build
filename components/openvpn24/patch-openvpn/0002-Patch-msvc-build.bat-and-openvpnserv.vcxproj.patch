@@ -1,12 +1,12 @@
-From 0d259fd9f291434e762c5cd9e180f482fbda94a8 Mon Sep 17 00:00:00 2001
+From fbb3d21dc3cb10786efdaed9b60dd99075ee157b Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Wed, 6 Mar 2019 00:41:57 +0900
 Subject: [PATCH 02/12] Patch msvc-build.bat and openvpnserv.vcxproj
 
 ---
  msvc-build.bat                              | 10 +++++++---
- src/openvpnserv/openvpnserv.vcxproj         | 15 ++++++++++----
- src/openvpnserv/openvpnserv.vcxproj.filters | 22 +++++++++++++++++++--
+ src/openvpnserv/openvpnserv.vcxproj         | 15 +++++++++++----
+ src/openvpnserv/openvpnserv.vcxproj.filters | 22 ++++++++++++++++++++--
  3 files changed, 38 insertions(+), 9 deletions(-)
 
 diff --git a/msvc-build.bat b/msvc-build.bat
@@ -142,5 +142,5 @@ index 0c89b4f4..664172b7 100644
    <ItemGroup>
      <ResourceCompile Include="openvpnserv_resources.rc">
 -- 
-2.23.0.windows.1
+2.11.0
 

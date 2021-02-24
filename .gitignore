@@ -1,4 +1,6 @@
 out/
+# On Windows, qt builds to <repo>/_qt (instead of components/qt/out/build/) to minimize file path lengths
+_qt/
 build.tmp/
 .DS_Store
 .deps/

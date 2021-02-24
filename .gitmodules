@@ -46,3 +46,24 @@
 [submodule "components/patchelf/patchelf"]
 	path = components/patchelf/patchelf
 	url = https://github.com/NixOS/patchelf
+[submodule "components/xcb/xcbproto"]
+	path = components/xcb/xcbproto
+	url = https://gitlab.freedesktop.org/xorg/proto/xcbproto.git
+[submodule "components/xcb/libxcb"]
+	path = components/xcb/libxcb
+	url = https://gitlab.freedesktop.org/xorg/lib/libxcb.git
+[submodule "components/xcb/libxcb-image"]
+	path = components/xcb/libxcb-image
+	url = https://gitlab.freedesktop.org/xorg/lib/libxcb-image.git
+[submodule "components/xcb/libxcb-keysyms"]
+	path = components/xcb/libxcb-keysyms
+	url = https://gitlab.freedesktop.org/xorg/lib/libxcb-keysyms.git
+[submodule "components/xcb/libxcb-render-util"]
+	path = components/xcb/libxcb-render-util
+	url = https://gitlab.freedesktop.org/xorg/lib/libxcb-render-util.git
+[submodule "components/xcb/libxcb-util"]
+	path = components/xcb/libxcb-util
+	url = https://gitlab.freedesktop.org/xorg/lib/libxcb-util.git
+[submodule "components/xcb/libxcb-wm"]
+	path = components/xcb/libxcb-wm
+	url = https://gitlab.freedesktop.org/xorg/lib/libxcb-wm.git

@@ -12,11 +12,15 @@ CRCsum="$CRCsum"
 MD5="$MD5sum"
 SHA="$SHAsum"
 TMPROOT=\${TMPDIR:=/tmp}
-USER_PWD="\$PWD"; export USER_PWD
+USER_PWD="\$PWD"
+export USER_PWD
+ARCHIVE_DIR=`dirname \$0`
+export ARCHIVE_DIR
 
 label="$LABEL"
 script="$SCRIPT"
 scriptargs="$SCRIPTARGS"
+cleanup_script="${CLEANUP_SCRIPT}"
 licensetxt="$LICENSE"
 helpheader='$HELPHEADER'
 targetdir="$archdirname"
@@ -28,6 +32,7 @@ accept="n"
 nodiskspace="n"
 export_conf="$EXPORT_CONF"
 decrypt_cmd="$DECRYPT_CMD"
+skip="$SKIP"
 
 print_cmd_arg=""
 if type printf > /dev/null; then
@@ -58,7 +63,11 @@ MS_Printf()
 MS_PrintLicense()
 {
   if test x"\$licensetxt" != x; then
-    echo "\$licensetxt" | more
+    if test x"\$accept" = xy; then
+      echo "\$licensetxt"
+    else
+      echo "\$licensetxt" | more
+    fi
     if test x"\$accept" != xy; then
       while true
       do
@@ -109,7 +118,7 @@ MS_dd_Progress()
     blocks=\`expr \$length / \$bsize\`
     bytes=\`expr \$length % \$bsize\`
     (
-        dd ibs=\$offset skip=1 2>/dev/null
+        dd ibs=\$offset skip=1 count=0 2>/dev/null
         pos=\`expr \$pos \+ \$bsize\`
         MS_Printf "     0%% " 1>&2
         if test \$blocks -gt 0; then
@@ -153,12 +162,14 @@ MS_Help()
   --confirm             Ask before running embedded script
   --quiet               Do not print anything except error messages
   --accept              Accept the license
-  --noexec              Do not run embedded script
+  --noexec              Do not run embedded script (implies --noexec-cleanup)
+  --noexec-cleanup      Do not run embedded cleanup script
   --keep                Do not erase target directory after running
                         the embedded script
   --noprogress          Do not show the progress during the decompression
   --nox11               Do not spawn an xterm
-  --nochown             Do not give the extracted files to the current user
+  --nochown             Do not give the target folder to the current user
+  --chown               Give the target folder to the current user recursively
   --nodiskspace         Do not check for available disk space
   --target dir          Extract directly to a target directory (absolute or relative)
                         This directory may undergo recursive chown (see --nochown).
@@ -167,6 +178,8 @@ MS_Help()
                         using OpenSSL. See "PASS PHRASE ARGUMENTS" in man openssl.
                         Default is to prompt the user to enter decryption password
                         on the current terminal.
+  --cleanup-args args   Arguments to the cleanup script. Wrap in quotes to provide
+                        multiple arguments.
   --                    Following arguments will be passed to the embedded script
 EOH
 }
@@ -187,7 +200,7 @@ MS_Check()
     if test x"\$quiet" = xn; then
 		MS_Printf "Verifying archive integrity..."
     fi
-    offset=\`head -n $SKIP "\$1" | wc -c | tr -d " "\`
+    offset=\`head -n "\$skip" "\$1" | wc -c | tr -d " "\`
     verb=\$2
     i=1
     for s in \$filesizes
@@ -205,7 +218,7 @@ MS_Check()
 				if test x"\$shasum" != x"\$sha"; then
 					echo "Error in SHA256 checksums: \$shasum is different from \$sha" >&2
 					exit 2
-				else
+				elif test x"\$quiet" = xn; then
 					MS_Printf " SHA256 checksums are OK." >&2
 				fi
 				crc="0000000000";
@@ -223,7 +236,7 @@ MS_Check()
 				if test x"\$md5sum" != x"\$md5"; then
 					echo "Error in MD5 checksums: \$md5sum is different from \$md5" >&2
 					exit 2
-				else
+				elif test x"\$quiet" = xn; then
 					MS_Printf " MD5 checksums are OK." >&2
 				fi
 				crc="0000000000"; verb=n
@@ -233,11 +246,11 @@ MS_Check()
 			test x"\$verb" = xy && echo " \$1 does not contain a CRC checksum." >&2
 		else
 			sum1=\`MS_dd_Progress "\$1" \$offset \$s | CMD_ENV=xpg4 cksum | awk '{print \$1}'\`
-			if test x"\$sum1" = x"\$crc"; then
-				MS_Printf " CRC checksums are OK." >&2
-			else
+			if test x"\$sum1" != x"\$crc"; then
 				echo "Error in checksums: \$sum1 is different from \$crc" >&2
-				exit 2;
+				exit 2
+			elif test x"\$quiet" = xn; then
+				MS_Printf " CRC checksums are OK." >&2
 			fi
 		fi
 		i=\`expr \$i + 1\`
@@ -270,13 +283,32 @@ UnTAR()
     fi
 }
 
+MS_exec_cleanup() {
+    if test x"\$cleanup" = xy && test x"\$cleanup_script" != x""; then
+        cleanup=n
+        cd "\$tmpdir"
+        eval "\"\$cleanup_script\" \$scriptargs \$cleanupargs"
+    fi
+}
+
+MS_cleanup()
+{
+    echo 'Signal caught, cleaning up' >&2
+    MS_exec_cleanup
+    cd "\$TMPROOT"
+    rm -rf "\$tmpdir"
+    eval \$finish; exit 15
+}
+
 finish=true
 xterm_loop=
 noprogress=$NOPROGRESS
 nox11=$NOX11
 copy=$COPY
-ownership=y
+ownership=$OWNERSHIP
 verbose=n
+cleanup=y
+cleanupargs=
 
 initargs="\$@"
 
@@ -328,15 +360,16 @@ do
 	echo LABEL=\"\$label\"
 	echo SCRIPT=\"\$script\"
 	echo SCRIPTARGS=\"\$scriptargs\"
+    echo CLEANUPSCRIPT=\"\$cleanup_script\"
 	echo archdirname=\"$archdirname\"
 	echo KEEP=$KEEP
 	echo NOOVERWRITE=$NOOVERWRITE
 	echo COMPRESS=$COMPRESS
 	echo filesizes=\"\$filesizes\"
 	echo CRCsum=\"\$CRCsum\"
-	echo MD5sum=\"\$MD5\"
-	echo OLDUSIZE=$USIZE
-	echo OLDSKIP=`expr $SKIP + 1`
+	echo MD5sum=\"\$MD5sum\"
+	echo SHAsum=\"\$SHAsum\"
+	echo SKIP=\"\$skip\"
 	exit 0
 	;;
     --lsm)
@@ -349,7 +382,7 @@ EOLSM
 	;;
     --list)
 	echo Target directory: \$targetdir
-	offset=\`head -n $SKIP "\$0" | wc -c | tr -d " "\`
+	offset=\`head -n "\$skip" "\$0" | wc -c | tr -d " "\`
 	for s in \$filesizes
 	do
 	    MS_dd "\$0" \$offset \$s | MS_Decompress | UnTAR t
@@ -358,7 +391,7 @@ EOLSM
 	exit 0
 	;;
 	--tar)
-	offset=\`head -n $SKIP "\$0" | wc -c | tr -d " "\`
+	offset=\`head -n "\$skip" "\$0" | wc -c | tr -d " "\`
 	arg1="\$2"
     if ! shift 2; then MS_Help; exit 1; fi
 	for s in \$filesizes
@@ -378,8 +411,13 @@ EOLSM
 	;;
 	--noexec)
 	script=""
+    cleanup_script=""
 	shift
 	;;
+    --noexec-cleanup)
+    cleanup_script=""
+    shift
+    ;;
     --keep)
 	keep=y
 	shift
@@ -401,6 +439,10 @@ EOLSM
 	ownership=n
 	shift
 	;;
+    --chown)
+        ownership=y
+        shift
+        ;;
     --nodiskspace)
 	nodiskspace=y
 	shift
@@ -424,6 +466,10 @@ EOLSM
 	decrypt_cmd="\$decrypt_cmd -pass \$2"
 	if ! shift 2; then MS_Help; exit 1; fi
 	;;
+    --cleanup-args)
+    cleanupargs="\$2"
+    if ! shift 2; then MS_help; exit 1; fi
+    ;;
     --)
 	shift
 	break ;;
@@ -485,9 +531,9 @@ if test x"\$nox11" = xn; then
                 done
                 chmod a+x \$0 || echo Please add execution rights on \$0
                 if test \`echo "\$0" | cut -c1\` = "/"; then # Spawn a terminal!
-                    exec \$XTERM -title "\$label" -e "\$0" --xwin "\$initargs"
+                    exec \$XTERM -e "\$0 --xwin \$initargs"
                 else
-                    exec \$XTERM -title "\$label" -e "./\$0" --xwin "\$initargs"
+                    exec \$XTERM -e "./\$0 --xwin \$initargs"
                 fi
             fi
         fi
@@ -523,7 +569,7 @@ location="\`pwd\`"
 if test x"\$SETUP_NOCHECK" != x1; then
     MS_Check "\$0"
 fi
-offset=\`head -n $SKIP "\$0" | wc -c | tr -d " "\`
+offset=\`head -n "\$skip" "\$0" | wc -c | tr -d " "\`
 
 if test x"\$verbose" = xy; then
 	MS_Printf "About to extract $USIZE KB in \$tmpdir ... Proceed ? [Y/n] "
@@ -544,7 +590,7 @@ if test x"\$quiet" = xn; then
 fi
 res=3
 if test x"\$keep" = xn; then
-    trap 'echo Signal caught, cleaning up >&2; cd "\$TMPROOT"; /bin/rm -rf "\$tmpdir"; eval \$finish; exit 15' 1 2 3 15
+    trap MS_cleanup 1 2 3 15
 fi
 
 if test x"\$nodiskspace" = xn; then
@@ -591,6 +637,7 @@ if test x"\$script" != x; then
         MS_KEEP="\$KEEP"
         MS_NOOVERWRITE="\$NOOVERWRITE"
         MS_COMPRESS="\$COMPRESS"
+        MS_CLEANUP="\$cleanup"
         export MS_BUNDLE MS_LABEL MS_SCRIPT MS_SCRIPTARGS
         export MS_ARCHDIRNAME MS_KEEP MS_NOOVERWRITE MS_COMPRESS
     fi
@@ -608,9 +655,12 @@ if test x"\$script" != x; then
 		test x"\$verbose" = xy && echo "The program '\$script' returned an error code (\$res)" >&2
     fi
 fi
+
+MS_exec_cleanup
+
 if test x"\$keep" = xn; then
     cd "\$TMPROOT"
-    /bin/rm -rf "\$tmpdir"
+    rm -rf "\$tmpdir"
 fi
 eval \$finish; exit \$res
 EOF

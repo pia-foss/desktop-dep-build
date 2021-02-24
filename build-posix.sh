@@ -8,10 +8,13 @@ cd "$ROOT"
 SCRIPT="$(basename "${BASH_SOURCE[0]}")"
 die() { echo "$SCRIPT:" "$*" 1>&2; exit 1; }
 
-rm -rf out
-mkdir -p out/artifacts
-
 source util/platform.sh
+
+OUT="$ROOT/out/$PLATFORM_$ARCH"
+ARTIFACTS="$OUT/artifacts"
+
+rm -rf "$OUT"
+mkdir -p "$ARTIFACTS"
 
 if [ "$PLATFORM" == "linux" ]; then
     BUILD_QT=1
@@ -72,18 +75,6 @@ done
 
 echo "Building for $PLATFORM $ARCH"
 
-# Run batch scripts on Windows with cmd /c, invoke anything else directly
-function run_script() {
-    if [[ $0 =~ .*\.bat ]]; then
-        # COMSPEC is a system variable on Windows that shellcheck doesn't know
-        # about
-        # shellcheck disable=SC2154
-        "$COMSPEC" //c "$*"
-    else
-        "$*"
-    fi
-}
-
 function first() {
     echo "$1"
 }
@@ -104,7 +95,7 @@ fi
 
 echo "===Build OpenVPN and OpenSSL==="
 pushd components/openvpn24
-run_script "$(select_platform ./build-pia.bat ./build-posix.sh ./build-posix.sh)"
+./build-posix.sh
 popd
 
 echo "===Build Unbound and hnsd==="
@@ -119,44 +110,58 @@ popd
 
 echo "===Build WireGuard==="
 pushd components/wireguard
-# TODO - needs brand info on Windows
-run_script "$(select_platform ./scripts/build-windows.bat ./scripts/build-mac.sh ./scripts/build-linux.sh)"
+"$(select_platform N/A ./scripts/build-mac.sh ./scripts/build-linux.sh)"
 popd
 
-# ICU and Qt are only built on Linux
+# xcb is only built on Linux
+if [ "$PLATFORM" == "linux" ]; then
+    echo "===Build xcb==="
+    pushd components/xcb
+    ./build-linux.sh
+    popd
+fi
+
+# ICU and Qt are only built on Linux and can be skipped with --no-qt
 if [ -n "$BUILD_QT" ]; then
     echo "===Build ICU and Qt==="
     pushd components/qt
-    # Use the copy of OpenSSL built by OpenVPN
-    time ./build-linux.sh "${QTBUILD_EXTRA_ARGS[@]}" "../../components/openvpn24/out/build/$PLATFORM/openvpn"
+    # Use the copy of OpenSSL built by OpenVPN, and use the xcb libraries built
+    # above
+    time ./build-linux.sh "${QTBUILD_EXTRA_ARGS[@]}" \
+        "../../components/openvpn24/out/build/$PLATFORM/openvpn" \
+        "../../components/xcb/out/install"
     popd
 fi
 
 # Collect artifacts
-rm -rf "out/artifacts/$PLATFORM/$ARCH"
-mkdir -p "out/artifacts/$PLATFORM/$ARCH/built"
 cp \
     "components/hnsd/out/artifacts/$PLATFORM"/* \
     "components/shadowsocks/out/artifacts/$PLATFORM"/* \
     "components/wireguard/out/artifacts"/* \
-    "out/artifacts/$PLATFORM/$ARCH/built"
+    "$ARTIFACTS"
 
 if [ "$PLATFORM" == "linux" ]; then
-    # OpenVPN artifacts have bin/lib subdirectories on Linux
-    cp "components/openvpn24/out/artifacts/$PLATFORM"/{bin,lib}/* \
-        "out/artifacts/$PLATFORM/$ARCH/built"
+    # - OpenVPN artifacts have bin/lib subdirectories on Linux
+    # - Collect xcb libs (just dynamic libs, ignore static libs)
+    # - Use -d to preserve versioned symlinks for libs
+    cp -d "components/openvpn24/out/artifacts/$PLATFORM"/{bin,lib}/* \
+        "components/xcb/out/install/lib/"*.so* \
+        "$ARTIFACTS"
 else
     cp "components/openvpn24/out/artifacts/$PLATFORM"/* \
-        "out/artifacts/$PLATFORM/$ARCH/built"
+        "$ARTIFACTS"
 fi
+
+mv "$ARTIFACTS/wireguard-go" "$ARTIFACTS/pia-wireguard-go"
 
 # Separate unstripped binaries on Linux (stripping isn't done on macOS)
 if [ "$PLATFORM" != "macos" ]; then
-    mkdir -p "out/artifacts/$PLATFORM/$ARCH/debug"
-    mv "out/artifacts/$PLATFORM/$ARCH/built"/*.full "out/artifacts/$PLATFORM/$ARCH/debug"
+    mkdir -p "$OUT/debug"
+    mv "$ARTIFACTS"/*.full "$OUT/debug"
 fi
 
 if [ -n "$BUILD_QT" ]; then
     QT_PACKAGE="$(first "components/qt/out/artifacts"/qt-*.run)"
-    mv "$QT_PACKAGE" "out/artifacts/$PLATFORM/$ARCH/"
+    mkdir -p "$OUT/installers"
+    mv "$QT_PACKAGE" "$OUT/installers"
 fi

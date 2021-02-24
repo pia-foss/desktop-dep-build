@@ -1,17 +1,17 @@
-From a2327810364167f5ac3ba3a167c4ea329e5aba04 Mon Sep 17 00:00:00 2001
+From e13b224f41f1de7e40a814969b1776bc3ab4f159 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Thu, 21 Mar 2019 10:07:06 -0400
-Subject: [PATCH 4/5] Fix source archive check for TAP adapter
+Subject: [PATCH 2/3] Fix source archive check for TAP adapter
 
 ---
  msvc/build.bat | 5 ++++-
  1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/msvc/build.bat b/msvc/build.bat
-index 672ef54..7ce41d4 100644
+index 8a8915d..9a71868 100644
 --- a/msvc/build.bat
 +++ b/msvc/build.bat
-@@ -103,7 +103,10 @@ for %%f in (%download_list%) do (
+@@ -96,7 +96,10 @@ for %%f in (%download_list%) do (
  	for /f %%i in ("!URL!") do set NAME=%%~ni%%~xi
  	set found=
  	for %%i in (sources\%%f*) do set found=1

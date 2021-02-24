@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# Copyright (c) 2020 Private Internet Access, Inc.
+# Copyright (c) 2021 Private Internet Access, Inc.
 #
 # This file is part of the Private Internet Access Desktop Client.
 #
@@ -60,7 +60,7 @@ case "$(uname)" in
         unbound_platform_cfgargs="--host=${MINGW_CHOST} --build=${MINGW_CHOST}"
         ;;
     MINGW32_NT*)
-        platform=mingw
+        platform=mingw32
         openssl_platform=mingw
         # In addition to the host/build tweak, MinGW32 is missing
         # lib/bfd-plugins/liblto_plugin-0.dll, use gcc-ar and gcc-ranlib instead

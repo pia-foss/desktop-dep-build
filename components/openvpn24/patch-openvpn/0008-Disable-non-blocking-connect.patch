@@ -1,17 +1,17 @@
-From 91bccdc4c7f3a67586c5188f35d5435160b3a699 Mon Sep 17 00:00:00 2001
+From c96ffe388a8fdab66c87da5d46562c85e4288233 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 8 Mar 2019 03:02:48 +0900
-Subject: [PATCH 08/12] Disable non-blocking connect
+Subject: [PATCH 4/8] Disable non-blocking connect
 
 ---
  src/openvpn/syshead.h | 4 ++++
  1 file changed, 4 insertions(+)
 
 diff --git a/src/openvpn/syshead.h b/src/openvpn/syshead.h
-index 3ac9d70c..baeb43df 100644
+index 8342eae0..d07e01f8 100644
 --- a/src/openvpn/syshead.h
 +++ b/src/openvpn/syshead.h
-@@ -661,9 +661,13 @@ socket_defined(const socket_descriptor_t sd)
+@@ -628,9 +628,13 @@ socket_defined(const socket_descriptor_t sd)
  /*
   * Is non-blocking connect() supported?
   */
@@ -24,7 +24,7 @@ index 3ac9d70c..baeb43df 100644
 +*/
  
  /*
-  * Do we have the capability to support the AUTO_USERID feature?
+  * Compression support
 -- 
-2.11.0
+2.20.1
 

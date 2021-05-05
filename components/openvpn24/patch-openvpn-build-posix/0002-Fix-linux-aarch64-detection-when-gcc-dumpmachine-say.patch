@@ -1,4 +1,4 @@
-From 1e7c9654461a5161f0e036edef0955858582d865 Mon Sep 17 00:00:00 2001
+From 63aef017da7117b4e311df3e1fb1f9b1ebf82f3e Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jonathon@privateinternetaccess.com>
 Date: Wed, 19 Aug 2020 20:21:34 +0000
 Subject: [PATCH 2/2] Fix linux-aarch64 detection when gcc -dumpmachine says
@@ -22,5 +22,5 @@ index e5d41bf..aa9bb41 100755
  	*-freebsd*)		system="BSD";;
  	*-solaris*)
 -- 
-2.25.1
+2.20.1
 

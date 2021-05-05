@@ -1,25 +1,25 @@
-From 8dbafe2c32bffee4d77090d70b530a268c0a45cb Mon Sep 17 00:00:00 2001
+From 79077b7bfff5ec66d7dee5809fab43a968939a4f Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 8 Mar 2019 03:03:42 +0900
-Subject: [PATCH 10/12] Accept other TAP adapter IDs as well
+Subject: [PATCH 6/8] Accept other TAP adapter IDs as well
 
 ---
  src/openvpn/tun.c | 2 ++
  1 file changed, 2 insertions(+)
 
 diff --git a/src/openvpn/tun.c b/src/openvpn/tun.c
-index 91ad03ac..520cd90d 100644
+index 1767420b..8d7bf2d4 100644
 --- a/src/openvpn/tun.c
 +++ b/src/openvpn/tun.c
-@@ -3706,6 +3706,8 @@ get_tap_reg(struct gc_arena *gc)
-                 if (status == ERROR_SUCCESS && data_type == REG_SZ)
-                 {
-                     if (!strcmp(component_id, TAP_WIN_COMPONENT_ID) ||
-+                        !strcmp(component_id, "tap-pia-0901") ||
-+                        !strcmp(component_id, "root\\tap-pia-0901") ||
-                         !strcmp(component_id, "root\\" TAP_WIN_COMPONENT_ID))
+@@ -3858,6 +3858,8 @@ get_tap_reg(struct gc_arena *gc)
+                     /* Is this adapter supported? */
+                     enum windows_driver_type windows_driver = WINDOWS_DRIVER_UNSPECIFIED;
+                     if (strcasecmp(component_id, TAP_WIN_COMPONENT_ID) == 0
++                        || strcasecmp(component_id, "tap-pia-0901") == 0
++                        || strcasecmp(component_id, "root\\tap-pia-0901") == 0
+                         || strcasecmp(component_id, "root\\" TAP_WIN_COMPONENT_ID) == 0)
                      {
-                         struct tap_reg *reg;
+                         windows_driver = WINDOWS_DRIVER_TAP_WINDOWS6;
 -- 
-2.11.0
+2.20.1
 

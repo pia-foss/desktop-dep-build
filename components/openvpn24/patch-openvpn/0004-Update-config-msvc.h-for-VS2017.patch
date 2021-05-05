@@ -1,17 +1,17 @@
-From 443473456da77d7f9b8fe23adc898886ee48cd18 Mon Sep 17 00:00:00 2001
+From 1142f204b038852cb9d9ab9f3886b936210bbda5 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Thu, 7 Mar 2019 17:08:24 +0900
-Subject: [PATCH 04/12] Update config-msvc.h for VS2017
+Subject: [PATCH 2/8] Update config-msvc.h for VS2017
 
 ---
  config-msvc.h | 1 +
  1 file changed, 1 insertion(+)
 
 diff --git a/config-msvc.h b/config-msvc.h
-index 836068dd..0381b7cc 100644
+index f199bb2c..312f84bd 100644
 --- a/config-msvc.h
 +++ b/config-msvc.h
-@@ -46,6 +46,7 @@
+@@ -45,6 +45,7 @@
  #define HAVE_LZO_LZO1X_H 1
  #define HAVE_LZO_LZOUTIL_H 1
  #define HAVE_VERSIONHELPERS_H 1
@@ -20,5 +20,5 @@ index 836068dd..0381b7cc 100644
  #define HAVE_ACCESS 1
  #define HAVE_CHDIR 1
 -- 
-2.11.0
+2.20.1
 

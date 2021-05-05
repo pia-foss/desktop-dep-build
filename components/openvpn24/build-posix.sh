@@ -58,7 +58,7 @@ openvpn_version="pia"
 openvpn_directory="${__dir}/build.tmp/openvpn-${openvpn_version}"
 openvpn_build_directory="${__dir}/build.tmp/openvpn-build"
 
-openssl_version="1.1.1g"
+openssl_version="1.1.1k"
 
 output_directory="${__dir}/out/build/${platform}"
 artifacts_dir="${__dir}/out/artifacts/${platform}"
@@ -118,6 +118,11 @@ export OPENVPN_VERSION="${openvpn_version}"
 export OPENSSL_VERSION="${openssl_version}"
 # Extra openvpn-build options
 export EXTRA_OPENVPN_CONFIG="$EXTRA_OPENVPN_CONFIG --enable-password-save --enable-management --disable-server --disable-debug --disable-silent-rules --disable-plugins --disable-plugin-auth-pam --disable-plugin-down-root"
+# The version of python-docutils installed by Homebrew on macOS has .py
+# extensions on both of these
+if [ "$(uname)" = "Darwin" ]; then
+    export EXTRA_OPENVPN_CONFIG="$EXTRA_OPENVPN_CONFIG RST2MAN=rst2man.py RST2HTML=rst2html.py"
+fi
 
 # Configure openvpn-build
 echo "Configuring OpenVPN build..."

@@ -1,7 +1,7 @@
-From e94d9084448f5ada0c072db726ef71f98c9d958d Mon Sep 17 00:00:00 2001
+From ebb89fb7787df56a603cfaffd8e085bfb9663d5d Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 8 Mar 2019 03:02:15 +0900
-Subject: [PATCH 07/12] Add --pia-signal-settings feature
+Subject: [PATCH 3/8] Add --pia-signal-settings feature
 
 ---
  src/openvpn/init.c        |  5 +++++
@@ -17,11 +17,11 @@ Subject: [PATCH 07/12] Add --pia-signal-settings feature
  create mode 100644 src/openvpn/pia-inline.h
 
 diff --git a/src/openvpn/init.c b/src/openvpn/init.c
-index 34d830a3..1e9e710b 100644
+index ed7e732f..a070a65c 100644
 --- a/src/openvpn/init.c
 +++ b/src/openvpn/init.c
-@@ -2876,6 +2876,11 @@ do_init_crypto_tls(struct context *c, const unsigned int flags)
-         tls_crypt_adjust_frame_parameters(&to.frame);
+@@ -3017,6 +3017,11 @@ do_init_crypto_tls(struct context *c, const unsigned int flags)
+         }
      }
  
 +    if (options->pia_signal_settings)
@@ -33,20 +33,20 @@ index 34d830a3..1e9e710b 100644
       * length prefix */
      socket_adjust_frame_parameters(&to.frame, options->ce.proto);
 diff --git a/src/openvpn/options.c b/src/openvpn/options.c
-index 192c6725..41718ec8 100644
+index 0d99e99c..c003518a 100644
 --- a/src/openvpn/options.c
 +++ b/src/openvpn/options.c
-@@ -903,6 +903,7 @@ init_options(struct options *o, const bool init_gc)
+@@ -898,6 +898,7 @@ init_options(struct options *o, const bool init_gc)
+     }
  #endif /* _WIN32 */
- #endif /* P2MP_SERVER */
      o->allow_recursive_routing = false;
 +    o->pia_signal_settings = false;
  }
  
  void
-@@ -7525,6 +7526,11 @@ add_option(struct options *options,
-         VERIFY_PERMISSION(OPT_P_GENERAL|OPT_P_INSTANCE);
-         options->ncp_enabled = false;
+@@ -7985,6 +7986,11 @@ add_option(struct options *options,
+             "cipher negotiation is a deprecated debug feature that "
+             "will be removed in OpenVPN 2.6");
      }
 +    else if (streq(p[0], "pia-signal-settings"))
 +    {
@@ -57,10 +57,10 @@ index 192c6725..41718ec8 100644
      {
          VERIFY_PERMISSION(OPT_P_GENERAL);
 diff --git a/src/openvpn/options.h b/src/openvpn/options.h
-index f3cafeaf..60e0f9fa 100644
+index 877e9396..3516641c 100644
 --- a/src/openvpn/options.h
 +++ b/src/openvpn/options.h
-@@ -611,6 +611,8 @@ struct options
+@@ -648,6 +648,8 @@ struct options
      /* Useful when packets sent by openvpn itself are not subject
       * to the routing tables that would move packets into the tunnel. */
      bool allow_recursive_routing;
@@ -109,7 +109,7 @@ index 00000000..e04d6898
 +    buf_write(buf, settings_msg, len);
 +}
 diff --git a/src/openvpn/ssl.c b/src/openvpn/ssl.c
-index f98799ed..b1635abc 100644
+index d7494c2b..670e06b1 100644
 --- a/src/openvpn/ssl.c
 +++ b/src/openvpn/ssl.c
 @@ -64,6 +64,8 @@
@@ -118,10 +118,10 @@ index f98799ed..b1635abc 100644
  
 +#include "pia-inline.h"
 +
- #ifndef ENABLE_OCC
- static const char ssl_default_options_string[] = "V0 UNDEF";
- #endif
-@@ -622,6 +624,11 @@ init_ssl(const struct options *options, struct tls_root_ctx *new_ctx)
+ #ifdef MEASURE_TLS_HANDSHAKE_STATS
+ 
+ static int tls_handshake_success; /* GLOBAL */
+@@ -604,6 +606,11 @@ init_ssl(const struct options *options, struct tls_root_ctx *new_ctx)
          tls_ctx_client_new(new_ctx);
      }
  
@@ -133,7 +133,7 @@ index f98799ed..b1635abc 100644
      /* Restrict allowed certificate crypto algorithms */
      tls_ctx_set_cert_profile(new_ctx, options->tls_cert_profile);
  
-@@ -2834,6 +2841,11 @@ tls_process(struct tls_multi *multi,
+@@ -2684,6 +2691,11 @@ tls_process(struct tls_multi *multi,
                  ks->must_negotiate = now + session->opt->handshake_window;
                  ks->auth_deferred_expire = now + auth_deferred_expire_window(session->opt);
  
@@ -146,41 +146,41 @@ index f98799ed..b1635abc 100644
                  reliable_mark_active_outgoing(ks->send_reliable, buf, ks->initial_opcode);
                  INCR_GENERATED;
 diff --git a/src/openvpn/ssl_backend.h b/src/openvpn/ssl_backend.h
-index c614efa6..e56aaf42 100644
+index 7f52ab1e..34221a2c 100644
 --- a/src/openvpn/ssl_backend.h
 +++ b/src/openvpn/ssl_backend.h
-@@ -158,6 +158,13 @@ void tls_ctx_free(struct tls_root_ctx *ctx);
+@@ -155,6 +155,13 @@ void tls_ctx_free(struct tls_root_ctx *ctx);
+  */
  bool tls_ctx_initialised(struct tls_root_ctx *ctx);
  
- /**
++/**
 + * Enable PIA signal settings mode.
 + *
 + * @param ctx           TLS context to set flag on
 + */
 +void tls_ctx_set_pia_signal_settings(struct tls_root_ctx *ctx);
 +
-+/**
+ /**
   * Set any library specific options.
   *
-  * Examples include disabling session caching, the password callback to use,
-@@ -322,6 +329,12 @@ void tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
-                      );
+@@ -325,6 +332,12 @@ int tls_ctx_use_management_external_key(struct tls_root_ctx *ctx);
+ void tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
+                      bool ca_file_inline, const char *ca_path, bool tls_server);
  
- /**
++/**
 + * Get the MD5 digest hex string for the first configured certificate authority.
 + * If there is no configured CA, returns NULL.
 + */
 +const char *tls_ctx_get_pia_first_ca_digest(struct tls_root_ctx *ctx);
 +
-+/**
+ /**
   * Load extra certificate authority certificates from the given file or path.
   * These Load extra certificates that are part of our own certificate
-  * chain but shouldn't be included in the verify chain.
 diff --git a/src/openvpn/ssl_common.h b/src/openvpn/ssl_common.h
-index 378b81fd..93a2944b 100644
+index 96897e48..3e7e9726 100644
 --- a/src/openvpn/ssl_common.h
 +++ b/src/openvpn/ssl_common.h
-@@ -346,6 +346,8 @@ struct tls_options
+@@ -366,6 +366,8 @@ struct tls_options
      const char *ekm_label;
      size_t ekm_label_size;
      size_t ekm_size;
@@ -190,10 +190,10 @@ index 378b81fd..93a2944b 100644
  
  /** @addtogroup control_processor
 diff --git a/src/openvpn/ssl_openssl.c b/src/openvpn/ssl_openssl.c
-index ff71b9c4..b5705d7f 100644
+index 5ba74402..5da805c2 100644
 --- a/src/openvpn/ssl_openssl.c
 +++ b/src/openvpn/ssl_openssl.c
-@@ -115,6 +115,9 @@ tls_ctx_server_new(struct tls_root_ctx *ctx)
+@@ -120,6 +120,9 @@ tls_ctx_server_new(struct tls_root_ctx *ctx)
          crypto_msg(M_WARN, "Warning: TLS server context initialisation "
                     "has warnings.");
      }
@@ -203,7 +203,7 @@ index ff71b9c4..b5705d7f 100644
  }
  
  void
-@@ -133,6 +136,9 @@ tls_ctx_client_new(struct tls_root_ctx *ctx)
+@@ -138,6 +141,9 @@ tls_ctx_client_new(struct tls_root_ctx *ctx)
          crypto_msg(M_WARN, "Warning: TLS client context initialisation "
                     "has warnings.");
      }
@@ -213,10 +213,11 @@ index ff71b9c4..b5705d7f 100644
  }
  
  void
-@@ -154,6 +160,19 @@ tls_ctx_initialised(struct tls_root_ctx *ctx)
+@@ -158,6 +164,19 @@ tls_ctx_initialised(struct tls_root_ctx *ctx)
+     return NULL != ctx->ctx;
  }
  
- void
++void
 +tls_ctx_set_pia_signal_settings(struct tls_root_ctx *ctx)
 +{
 +    ctx->pia_signal_settings = true;
@@ -229,11 +230,10 @@ index ff71b9c4..b5705d7f 100644
 +#endif
 +}
 +
-+void
+ void
  key_state_export_keying_material(struct key_state_ssl *ssl,
                                   struct tls_session *session)
- {
-@@ -1360,6 +1379,17 @@ tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
+@@ -1584,6 +1603,17 @@ tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
                      X509_STORE_add_cert(store, info->x509);
                      added++;
  
@@ -251,7 +251,7 @@ index ff71b9c4..b5705d7f 100644
                      if (!tls_server)
                      {
                          continue;
-@@ -1454,6 +1484,12 @@ tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
+@@ -1679,6 +1709,12 @@ tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
      }
  }
  
@@ -263,12 +263,12 @@ index ff71b9c4..b5705d7f 100644
 +
  void
  tls_ctx_load_extra_certs(struct tls_root_ctx *ctx, const char *extra_certs_file,
-                          const char *extra_certs_file_inline
+                          bool extra_certs_file_inline)
 diff --git a/src/openvpn/ssl_openssl.h b/src/openvpn/ssl_openssl.h
-index dabb9412..c79e45ad 100644
+index 835878c3..d20a0b1a 100644
 --- a/src/openvpn/ssl_openssl.h
 +++ b/src/openvpn/ssl_openssl.h
-@@ -50,6 +50,8 @@ struct tls_root_ctx {
+@@ -39,6 +39,8 @@ struct tls_root_ctx {
      SSL_CTX *ctx;
      time_t crl_last_mtime;
      off_t crl_last_size;
@@ -278,5 +278,5 @@ index dabb9412..c79e45ad 100644
  
  struct key_state_ssl {
 -- 
-2.11.0
+2.20.1
 

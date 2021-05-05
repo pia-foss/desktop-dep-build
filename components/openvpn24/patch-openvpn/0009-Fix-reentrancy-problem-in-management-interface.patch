@@ -1,17 +1,17 @@
-From 736e3e42a2fa587147067e44f79dec39efff581e Mon Sep 17 00:00:00 2001
+From 6114030f79331d0107b86083d922d01bc7a7b911 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 8 Mar 2019 03:03:17 +0900
-Subject: [PATCH 09/12] Fix reentrancy problem in management interface
+Subject: [PATCH 5/8] Fix reentrancy problem in management interface
 
 ---
  src/openvpn/manage.c | 6 ++++--
  1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/src/openvpn/manage.c b/src/openvpn/manage.c
-index 6d1bdc10..00bdfe49 100644
+index d86b6a79..2adad8d3 100644
 --- a/src/openvpn/manage.c
 +++ b/src/openvpn/manage.c
-@@ -3081,7 +3081,7 @@ management_io(struct management *man)
+@@ -3188,7 +3188,7 @@ management_io(struct management *man)
                      net_event_win32_clear_selected_events(&man->connection.ne32, FD_ACCEPT);
                  }
              }
@@ -20,7 +20,7 @@ index 6d1bdc10..00bdfe49 100644
              {
                  if (net_events & FD_READ)
                  {
-@@ -3090,7 +3090,9 @@ management_io(struct management *man)
+@@ -3197,7 +3197,9 @@ management_io(struct management *man)
                      }
                      net_event_win32_clear_selected_events(&man->connection.ne32, FD_READ);
                  }
@@ -32,5 +32,5 @@ index 6d1bdc10..00bdfe49 100644
                  {
                      int status;
 -- 
-2.11.0
+2.20.1
 

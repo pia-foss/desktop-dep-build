@@ -1,4 +1,4 @@
-From ab32ed88b1fc5aaedb1f93b15d75ca56c1998c36 Mon Sep 17 00:00:00 2001
+From 721ca9af5e3e5234095e6efd04ce1bef807b1e21 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 22 Mar 2019 10:39:05 -0400
 Subject: [PATCH 1/2] No static libgcc on Mac OS
@@ -8,10 +8,10 @@ Subject: [PATCH 1/2] No static libgcc on Mac OS
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/generic/build.vars b/generic/build.vars
-index 28f2075..76726f1 100644
+index 03c3284..3a1af6f 100644
 --- a/generic/build.vars
 +++ b/generic/build.vars
-@@ -36,7 +36,9 @@ if [ -n "${DO_REALLY_STATIC}" ]; then
+@@ -40,7 +40,9 @@ if [ -n "${DO_REALLY_STATIC}" ]; then
  	export LDFLAGS="-Xcompiler -static"
  fi
  
@@ -23,5 +23,5 @@ index 28f2075..76726f1 100644
  #EXTRA_PKCS11_HELPER_CONFIG
  #EXTRA_OPENVPN_CONFIG
 -- 
-2.25.1
+2.20.1
 

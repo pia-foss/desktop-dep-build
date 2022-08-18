@@ -1,12 +1,6 @@
-[submodule "components/openvpn24/openvpn-build"]
-	path = components/openvpn24/openvpn-build
-	url = https://github.com/OpenVPN/openvpn-build.git
 [submodule "components/openvpn24/openvpn"]
 	path = components/openvpn24/openvpn
 	url = https://github.com/OpenVPN/openvpn.git
-[submodule "components/hnsd/openssl"]
-	path = components/hnsd/openssl
-	url = https://github.com/openssl/openssl
 [submodule "components/hnsd/unbound"]
 	path = components/hnsd/unbound
 	url = https://github.com/NLnetLabs/unbound
@@ -41,7 +35,7 @@
 	path = components/wireguard/wintun
 	url = git://git.zx2c4.com/wintun
 [submodule "components/qt/icu/icu"]
-	path = components/qt/icu/icu
+	path = components/icu/icu
 	url = https://github.com/unicode-org/icu.git
 [submodule "components/patchelf/patchelf"]
 	path = components/patchelf/patchelf
@@ -67,3 +61,6 @@
 [submodule "components/xcb/libxcb-wm"]
 	path = components/xcb/libxcb-wm
 	url = https://gitlab.freedesktop.org/xorg/lib/libxcb-wm.git
+[submodule "components/openssl/openssl"]
+	path = components/openssl/openssl
+	url = https://github.com/openssl/openssl

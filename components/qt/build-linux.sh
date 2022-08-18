@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# Copyright (c) 2021 Private Internet Access, Inc.
+# Copyright (c) 2022 Private Internet Access, Inc.
 #
 # This file is part of the Private Internet Access Desktop Client.
 #
@@ -18,12 +18,14 @@
 # along with the Private Internet Access Desktop Client.  If not, see
 # <https://www.gnu.org/licenses/>.
 
+set -e
+
 QT_MAJOR=5
 QT_MINOR=15
 QT_PATCH=2
 
 QT_VERSION="$QT_MAJOR.$QT_MINOR.$QT_PATCH"
-# Disk space required to build Qt (approximate).  The out/ directory has
+# Disk space required to build Qt (approximate).  The out/ directory
 # is usually around 40 GiB for a complete build.
 DISK_SPACE_NEEDED=40 # In GiB
 
@@ -31,7 +33,7 @@ source ../../util/platform.sh
 
 function show_usage() {
     echo "usage:"
-    echo "$0 [--rebuild] [--repack] [--extra-bin bin_path] [extra_prefix [...]]"
+    echo "$0 [--rebuild] [--repack] [--extra-bin bin_path] [--extra-install path] [--extra_prefix path] [...]"
     echo "$0 --help"
     echo ""
     echo "Builds Qt on Linux for use in PIA Desktop."
@@ -46,16 +48,66 @@ function show_usage() {
     echo "    install package.  (Implies --rebuild.)"
     echo "  --extra-bin: Add a binary to the bin/ directory of the bundle."
     echo "    (Used by desktop-dep-build to include patchelf.)"
-    echo "  extra_prefix: Path to an extra installation prefix add to include/"
-    echo "    lib paths when building Qt.  This can be used to configure Qt"
+    echo "    Can be passed multiple times."
+    echo "  --extra-install: Include the contents of this directory into the Qt"
+    echo "    installation (should contain bin/, lib/, include/, etc., which"
+    echo "    will be combined with Qt.)  Used to bundle libicu on Linux.  The"
+    echo "    directory is also used as an include/lib prefix (--extra-prefix)."
+    echo "    Can be passed multiple times."
+    echo "  --extra_prefix: Path to an extra installation prefix add to include"
+    echo "    and lib paths when building Qt.  This can be used to configure Qt"
     echo "    with a specific version of OpenSSL, etc."
     echo "    If this isn't provided, Qt will use the system libraries for all"
     echo "    dependencies."
+    echo "    Can be passed multiple times."
     echo "  --help: Shows this help."
     echo ""
 }
 
+function realpath_compat() {
+    ARG="$1"
+
+    case "$PLATFORM" in
+        linux)
+            realpath "$1"
+            ;;
+        *)
+            local REALDIR
+            REALDIR="$(cd "$(dirname "$ARG")" && pwd)"
+            echo "$REALDIR/$(basename "$ARG")"
+            ;;
+    esac
+}
+
+function sha256sum_compat() {
+    case "$PLATFORM" in
+        linux)
+            sha256sum "$@"
+            ;;
+        macos)
+            shasum -a 256 "$@"
+            ;;
+    esac
+}
+
+function diskfree_gb() {
+    case "$PLATFORM" in
+        linux)
+            df -BG -P "$1" | awk 'NR==2 { print substr($4, 1, length($4)-1) }'
+            ;;
+        macos)
+            df -g "$1" | awk 'NR==2 { print $4 }'
+            ;;
+    esac
+}
+
+function disk_vol() {
+    df "$1" | awk 'NR==2 { print $1 }'
+}
+
 EXTRA_BINS=()
+EXTRA_INSTALLS=()
+EXTRA_PREFIXES=()
 ARGS_DONE=0
 while [ "$#" -gt 0 ] && [ "$ARGS_DONE" -ne "1" ]; do
     case "$1" in
@@ -73,7 +125,17 @@ while [ "$#" -gt 0 ] && [ "$ARGS_DONE" -ne "1" ]; do
             shift
             ;;
         "--extra-bin")
-            EXTRA_BINS+=("$(realpath "$2")")
+            EXTRA_BINS+=("$(realpath_compat "$2")")
+            shift
+            shift
+            ;;
+        "--extra-install")
+            EXTRA_INSTALLS+=("$(realpath_compat "$2")")
+            shift
+            shift
+            ;;
+        "--extra-prefix")
+            EXTRA_PREFIXES+=("$(realpath_compat "$2")")
             shift
             shift
             ;;
@@ -93,12 +155,6 @@ while [ "$#" -gt 0 ] && [ "$ARGS_DONE" -ne "1" ]; do
     esac
 done
 
-EXTRA_PREFIXES=()
-while [ -n "$1" ]; do
-    EXTRA_PREFIXES+=("$(cd "$1" && pwd)")
-    shift
-done
-
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
@@ -107,7 +163,6 @@ if [ "$ARCH" == 'x86_64' ]; then
     QT_BUILD_NAME="clang_64"
 fi
 QT_INSTALL_ROOT="$ROOT/out/install/$QT_VERSION/$QT_BUILD_NAME"
-ARCHIVE_NAME="qt-$QT_VERSION-pia.tar.xz"
 
 set -e
 
@@ -119,12 +174,11 @@ if [ -z "$SKIP_CLEAN" ]; then
     rm -rf out/build
     rm -rf out/install
     rm -rf out/artifacts
-    rm -rf out/package
 
     # Check free space - building Qt requires a lot of disk space, no sense
     # building for 6+ hours just to run out
-    FREE_SPACE="$(df -BG -P out | awk 'NR==2 { print substr($4, 1, length($4)-1) }')"
-    VOLUME="$(df -BG -P out | awk 'NR==2 { print $1 }')"
+    FREE_SPACE="$(diskfree_gb out)"
+    VOLUME="$(disk_vol out)"
     if [ "$FREE_SPACE" -lt "$DISK_SPACE_NEEDED" ]; then
         echo "Building Qt requires approximately $DISK_SPACE_NEEDED GiB." >&2
         echo "This volume ($VOLUME) has $FREE_SPACE GiB free." >&2
@@ -138,7 +192,6 @@ mkdir -p out/cache
 mkdir -p out/build
 mkdir -p out/install
 mkdir -p out/artifacts
-mkdir -p out/package
 
 # Help out the Qt build scripts to find python.  QtQml really needs an
 # executable called 'python', but some distributions only have python3 or
@@ -174,7 +227,7 @@ fi
 if [ -z "$SKIP_CLEAN" ]; then
     # Verify the source archive
     echo "Verifying Qt $QT_SOURCE_ARCHIVE"
-    QT_SOURCE_ACTUAL="$(pv "$QT_SOURCE_ARCHIVE" | sha256sum | awk '{print $1}')"
+    QT_SOURCE_ACTUAL="$(pv "$QT_SOURCE_ARCHIVE" | sha256sum_compat | awk '{print $1}')"
     QT_SOURCE_EXPECTED="3a530d1b243b5dec00bc54937455471aaa3e56849d2593edb8ded07228202240"
 
     if [ "$QT_SOURCE_ACTUAL" != "$QT_SOURCE_EXPECTED" ]; then
@@ -190,29 +243,32 @@ if [ -z "$SKIP_CLEAN" ]; then
     # information
     echo "Extracting $QT_SOURCE_ARCHIVE"
     pv "$QT_SOURCE_ARCHIVE" | tar --xz -xf - -C out/build/qt
+
+    echo "Applying patches..."
+    for patch in patch-qt/*; do
+        echo "Applying $patch"
+        (cd out/build/qt/qt-everywhere-* && patch -p 1) <"$patch"
+    done
 fi
 
 if [ -z "$SKIP_BUILD" ]; then
-    echo "Build ICU"
-    pushd icu
-    ./build-linux.sh
-    popd
-
     EXTRA_PREFIX_ARGS=()
-    # Include the ICU we just built in the extra prefixes
-    for p in "${EXTRA_PREFIXES[@]}" "$ROOT/icu/out/install"; do
+    LIBPATH_VAR="$(select_platform none DYLD_LIBRARY_PATH LD_LIBRARY_PATH)"
+    for p in "${EXTRA_PREFIXES[@]}" "${EXTRA_INSTALLS[@]}"; do
         EXTRA_PREFIX_ARGS+=(-I "$p/include" -L "$p/lib")
-        export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$p/lib"
+        OLDLIBPATH="${!LIBPATH_VAR}"
+        export "$LIBPATH_VAR"="${OLDLIBPATH:+$OLDLIBPATH:}$p/lib"
     done
 
     echo "Extra prefix args:" "${EXTRA_PREFIX_ARGS[@]}"
+    echo "$LIBPATH_VAR: ${!LIBPATH_VAR}"
 
     pushd out/build/qt/qt-everywhere-src-$QT_VERSION
     echo "Configure Qt $QT_VERSION"
     # For Qt's reference CI configurations, refer to:
     # https://code.qt.io/cgit/qt/qt5.git/tree/coin/platform_configs/default.yaml?h=5.15
     # Qt ships the RHEL build as their binary installer on Linux.
-    ./configure \
+    [ "$PLATFORM" = linux ] && ./configure \
         -confirm-license -opensource \
         -release \
         -nomake tests -nomake examples \
@@ -238,17 +294,61 @@ if [ -z "$SKIP_BUILD" ]; then
         -fontconfig \
         -platform linux-clang
 
-    # Determine number of CPUs, amount of memory, and number of make jobs
-    CPUS="$(grep -Ec '^processor[[:space:]]+:' /proc/cpuinfo)" # Counts number of processors in cpuinfo
-    EXTRACPUJOBS=$(( ( CPUS / 2 < 4 ) ? CPUS / 2 : 4 )) # Add up to 4 extra jobs (or cpus/2 if smaller) to keep CPU busy
-    CPUJOBS=$(( CPUS + EXTRACPUJOBS )) # Number of jobs based on CPU cores
+    # linux opts
+        #-no-libudev \
+        #-no-use-gold-linker \
+        #-xcb \
+        #-system-freetype \
+        #-bundled-xcb-xinput \
+        #-icu \
+        #-fontconfig \
+    # changed
+        #-sysconfdir /etc/xdg \
+        #-platform linux-clang
+        #-no-sql-psql
 
-    MEMKB="$(awk '/MemTotal/{print $2}' /proc/meminfo)"
-    MEMGB=$(( ( MEMKB + 512*1024 ) / (1024*1024) )) # Memory, in GB, rounded to nearest GB
-    MEMJOBS="$MEMGB" # Use 1 job per GB of RAM at most
-    # Use smaller of CPU job limit or RAM job limit
-    JOBS=$(( CPUJOBS < MEMJOBS ? CPUJOBS : MEMJOBS ))
-    echo "Detected $CPUS CPUs (suggests $CPUJOBS jobs) and $MEMGB GB RAM (suggests $MEMJOBS jobs)"
+    # unsure
+        #-qt-libjpeg \
+        #-qt-libpng \
+        #-qt-pcre \
+        #-qt-harfbuzz \
+        # fontconfig?
+        # psql?
+        #-icu \
+
+    # TODO - add llvm freetype harfbuzz to homebrew package list
+    # On macOS, we have to explicitly set QMAKE_APPLE_DEVICE_ARCHS=arm64 to get
+    # an arm64 build (5.15.2 assumes x86_64 on macOS otherwise).
+    #
+    # We don't attempt cross builds of Qt; this is difficult to get working
+    # since Qt needs some of its built tools to build (qmake, moc, etc.).  We
+    # build Qt separately on x86_64 and arm64 hosts, then combine the two into a
+    # universal build.
+    [ "$PLATFORM" = macos ] && ./configure \
+        -confirm-license -opensource \
+        -release \
+        QMAKE_APPLE_DEVICE_ARCHS="$(uname -m)" \
+        -nomake tests -nomake examples \
+        -force-debug-info -separate-debug-info \
+        -no-sql-mysql -no-sql-psql -plugin-sql-sqlite \
+        -qt-libjpeg \
+        -qt-libpng \
+        -sysconfdir /Library/Preferences/Qt \
+        -qt-pcre \
+        -qt-harfbuzz \
+        -no-xcb \
+        -skip doc -skip webchannel -skip webengine -skip webview -skip sensors -skip serialport \
+        -R . \
+        -openssl \
+        "${EXTRA_PREFIX_ARGS[@]}" \
+        QMAKE_LFLAGS_APP+=-s \
+        -prefix "$QT_INSTALL_ROOT" \
+        -platform macx-clang
+
+    # Determine number of CPUs, amount of memory, and number of make jobs.  Use
+    # no more than 1 job per ~1000 MB of RAM, many link steps consume a lot of
+    # RAM, this can be limiting on small boards in particular
+    JOBS="$(calc_jobs 1000)"
     echo "Build Qt $QT_VERSION with $JOBS jobs"
     make "-j$JOBS"
 
@@ -256,8 +356,10 @@ if [ -z "$SKIP_BUILD" ]; then
     make install
     popd
 
-    # Include libicu in the Qt installation
-    cp -r icu/out/install/* "$QT_INSTALL_ROOT/"
+    # Include extra libs/headers in the Qt installation
+    for p in "${EXTRA_PREFIXES[@]}" "${EXTRA_INSTALLS[@]}"; do
+        cp -r "$p"/* "$QT_INSTALL_ROOT/"
+    done
 
     # Include extra bins passed on command line
     if [ "${#EXTRA_BINS[@]}" -ne 0 ]; then
@@ -265,24 +367,10 @@ if [ -z "$SKIP_BUILD" ]; then
     fi
 
     # Indicate that this is a PIA Qt build, the PIA build script checks this
+    # (/share doesn't always exist on macOS, but we still put the indicator there)
+    mkdir -p "$QT_INSTALL_ROOT/share"
     touch "$QT_INSTALL_ROOT/share/pia-qt-build"
 fi
 
 # Make distribution archive
-pushd "$QT_INSTALL_ROOT"
-echo "Creating $ARCHIVE_NAME"
-tar -c -f - ./* | pv -s "$(du -sb ./ | awk '{print $1}')" | xz > "$ROOT/out/package/$ARCHIVE_NAME"
-popd
-
-function script_subst() {
-    sed "s/{{QT_VERSION}}/$QT_VERSION/g; s/{{QT_ARCHIVE}}/$ARCHIVE_NAME/g; s/{{QT_BUILD_NAME}}/$QT_BUILD_NAME/g" "$1" > "$2"
-    chmod a+x "$2"
-}
-
-script_subst src/install.sh out/package/install.sh
-script_subst src/extract.sh out/package/extract.sh
-
-INSTALLER_NAME="out/artifacts/qt-$QT_VERSION-pia-$PLATFORM-$ARCH.run"
-echo "Creating $INSTALLER_NAME"
-# The makeself archive isn't compressed, the payload is already a compressed tar.xz
-makeself/makeself.sh --nocomp --tar-quietly --keep-umask --tar-extra "--owner=0 --group=0 --numeric-owner" out/package "$INSTALLER_NAME" "Qt $QT_VERSION - Private Internet Access" "./install.sh"
+./make-installer-package.sh "$QT_VERSION" "$QT_BUILD_NAME" "$PLATFORM" "$ARCH" "$QT_INSTALL_ROOT"

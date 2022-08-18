@@ -1,0 +1,31 @@
+From 6bb59dfe94bf2225de5d6bea57ead11b1d5caf7e Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jonathon.hall@privateinternetaccess.com>
+Date: Fri, 28 May 2021 14:48:18 -0400
+Subject: [PATCH 2/3] Rename wintun.inf -> pia-wintun.inf to match driver
+
+---
+ driver/driver.vcxproj                 | 2 +-
+ driver/{wintun.inf => pia-wintun.inf} | 0
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename driver/{wintun.inf => pia-wintun.inf} (100%)
+
+diff --git a/driver/driver.vcxproj b/driver/driver.vcxproj
+index db83701..05d9dd4 100644
+--- a/driver/driver.vcxproj
++++ b/driver/driver.vcxproj
+@@ -119,7 +119,7 @@
+     <ResourceCompile Include="wintun.rc" />
+   </ItemGroup>
+   <ItemGroup>
+-    <Inf Include="wintun.inf" />
++    <Inf Include="pia-wintun.inf" />
+     <FilesToPackage Include="$(TargetPath)" Condition="'$(ConfigurationType)'=='Driver' or '$(ConfigurationType)'=='DynamicLibrary'" />
+   </ItemGroup>
+   <ItemGroup>
+diff --git a/driver/wintun.inf b/driver/pia-wintun.inf
+similarity index 100%
+rename from driver/wintun.inf
+rename to driver/pia-wintun.inf
+-- 
+2.31.1.windows.1
+

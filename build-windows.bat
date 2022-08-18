@@ -5,14 +5,14 @@ setlocal
 if "%~2" == "" (
     echo usage: %0 ^<...path_to...^>\pia_desktop ^<brand_code^>
     echo.
-    echo Builds OpenVPN, the Wireguard service executable, and the WinTUN MSI distribution for PIA.
+    echo Builds OpenVPN and the Wireguard service executable for PIA.
     echo.
-    call components/wireguard/scripts/build-wintun.bat --help-details
+    echo Does not build WinTUN due to code signing requirements ^(EV CS cert,
+    echo WHQL^) - see components/wireguard/scripts/build-wintun-driver.bat
+    echo and components/wireguard/scripts/build-wintun-api.bat.
+    echo.
     goto :end
 )
-
-rem Get an absolute path from %1 before changing directories
-set PIA_DESKTOP_PATH=%~f1
 
 pushd %~dp0
 
@@ -21,9 +21,9 @@ pushd components\openvpn24
 call build-pia.bat
 popd
 
-echo ===Build WireGuard and WinTUN===
+echo ===Build WireGuard===
 pushd components\wireguard
-call scripts\build-windows.bat "%PIA_DESKTOP_PATH%" %2
+call scripts\build-wgservice.bat
 popd
 
 rem TODO - collect artifacts

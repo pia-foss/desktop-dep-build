@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# Copyright (c) 2021 Private Internet Access, Inc.
+# Copyright (c) 2022 Private Internet Access, Inc.
 #
 # This file is part of the Private Internet Access Desktop Client.
 #
@@ -20,60 +20,59 @@
 
 set -e
 
+function show_usage() {
+    echo "usage:"
+    echo "$0 <openssl_install>"
+    echo "$0 --help"
+    echo ""
+    echo "Builds unbound and hnsd for use in PIA Desktop."
+    echo ""
+    echo "Parameters:"
+    echo "  <openssl_install>: Path to the OpenSSL installation to use (contains"
+    echo "    bin, lib, etc.) - passed from main build script."
+    echo "  --help: Shows this help"
+    echo ""
+}
+
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 __file="${__dir}/$(basename "${BASH_SOURCE[0]}")"
 __base="$(basename "${__file}" .sh)"
 
 die() { echo "${__base}:" "$*" 1>&2 ; exit 1; }
 
+if [ "$#" -ne 1 ]; then
+    show_help
+    exit 1
+fi
+
+if [ "$0" = "--help" ]; then
+    show_help
+    exit 0
+fi
+
+OPENSSL_INST="$1"
+
 cd "$__dir"
 source ../../util/submodule.sh
+source ../../util/platform.sh
 
 # Set platform based on the host platform
-case "$(uname)" in
-    Linux)
-        case "$(uname -m)" in
-            x86_64)
-                platform=linux
-                openssl_platform=linux-x86_64
-                ;;
-            aarch64)
-                platform=linux
-                openssl_platform=linux-aarch64
-                ;;
-            armv7l)
-                platform=linux
-                openssl_platform=linux-generic32
-                ;;
-            *) die "Unsupported Linux architecture" ;;
-        esac
-        ;;
-    Darwin)
-        platform=macos
-        openssl_platform=darwin64-x86_64-cc
-        ;;
-    MINGW64_NT*)
-        platform=mingw64
-        openssl_platform=mingw64
+case "$PLATFORM" in
+    mingw64)
         # unbound's configure.ac checks for uname=MINGW32, but not MINGW64.
         # Pass --host and --build so it still detects MinGW.
         unbound_platform_cfgargs="--host=${MINGW_CHOST} --build=${MINGW_CHOST}"
         ;;
-    MINGW32_NT*)
-        platform=mingw32
-        openssl_platform=mingw
+    mingw32)
         # In addition to the host/build tweak, MinGW32 is missing
         # lib/bfd-plugins/liblto_plugin-0.dll, use gcc-ar and gcc-ranlib instead
         # which know to load that plugin from the gcc lib directory
         unbound_platform_cfgargs="--host=${MINGW_CHOST} --build=${MINGW_CHOST} AR=gcc-ar RANLIB=gcc-ranlib"
         ;;
-    *)
-        die "Unsupported host platform"
-        ;;
 esac
 
-output_dir="${__dir}/out/build/${platform}"
-artifacts_dir="${__dir}/out/artifacts/${platform}"
+output_dir="${__dir}/out/build/${PLATFORM}"
+artifacts_dir="${__dir}/out/artifacts/${PLATFORM}"
 build_dir="${__dir}/build.tmp"
 
 # For quick iterations on the build script itself, setting REBUILD skips the
@@ -89,35 +88,26 @@ mkdir -p "${output_dir}"
 mkdir -p "${artifacts_dir}"
 mkdir -p "${build_dir}"
 
-check_submodule_clean openssl
 check_submodule_clean unbound
 check_submodule_clean hnsd
 
-prep_submodule openssl "$build_dir"
 prep_submodule unbound "$build_dir"
 prep_submodule hnsd "$build_dir"
 
-echo "Building OpenSSL..."
-pushd "${build_dir}/openssl"
-./Configure $openssl_platform --prefix="${output_dir}/openssl"
-make -j2
-# The install_sw target skips man pages
-make install_sw
-popd
+JOBS="$(calc_jobs "")"
 
 echo "Building Unbound..."
 pushd "${build_dir}/unbound"
 # Rerun autoconf due to change to configure.ac
-autoconf
+autoreconf -i -v -f
 # Configure options
-# - Use OpenSSL built above
-# - Just build libunbound, skip unbound, unbound-anchor, etc.
+# - Use OpenSSL passed from main build script
 # - Don't build shared objects (just build static libraries)
 # - Always install to /usr/local prefix (default is different on MinGW)
 # shellcheck disable=SC2086
 # ^ Intentional wordsplitting of ${unbound_platform_cfgargs}
-./configure --with-ssl="${output_dir}/openssl" --disable-shared --enable-static ${unbound_platform_cfgargs} --prefix="${output_dir}/unbound" --disable-flto
-make -j2
+./configure --with-ssl="$OPENSSL_INST" --disable-shared --enable-static ${unbound_platform_cfgargs} --prefix="${output_dir}/unbound" --disable-flto
+make -j"$JOBS"
 make install
 popd
 
@@ -130,52 +120,20 @@ pushd "${build_dir}/hnsd"
 ./configure --with-network=testnet --with-unbound="${output_dir}/unbound"
 make -j2
 
-# Copy unbound to artifacts
+# Copy artifacts
 cp "${build_dir}/unbound/unbound" "${artifacts_dir}/pia-unbound"
-# Copy hnsd to artifacts
 cp "${build_dir}/hnsd/hnsd" "${artifacts_dir}/pia-hnsd"
 
-function strip_symbols() {
-    local ARTIFACT=$1
-    local EXT=$2
-
-    # Strip debugging symbols from hnsd, but keep a full copy in case it's
-    # needed for debugging
-    cp "${artifacts_dir}/${ARTIFACT}${EXT}" "${artifacts_dir}/${ARTIFACT}.full${EXT}"
-    strip --strip-debug "${artifacts_dir}/${ARTIFACT}${EXT}"
-    objcopy --add-gnu-debuglink="${artifacts_dir}/${ARTIFACT}.full${EXT}" "${artifacts_dir}/${ARTIFACT}${EXT}"
-}
-
-function mac_set_loader_path() {
-   local LIBNAME=$1
-   local TARGET=$2
-
-   local LIBPATH="$(otool -L "$TARGET" | sed -E $'s|^[ \t]*([^ \t].*/'"$LIBNAME"$').*$|\\1|' | grep "$LIBNAME")"
-   install_name_tool -change "$LIBPATH" "@loader_path/$LIBNAME" "$TARGET"
-}
-
-case $platform in
-    linux*)
-        # OpenSSL is dynamically linked.  We ship the dynamic libraries built from the desktop-openvpn repo,
-        # but the rpaths in these binaries need to be set.
+case $PLATFORM in
+    linux)
+        # Set rpaths in shipped executables
         patchelf --force-rpath --set-rpath '$ORIGIN/../lib' "${artifacts_dir}/pia-unbound"
         patchelf --force-rpath --set-rpath '$ORIGIN/../lib' "${artifacts_dir}/pia-hnsd"
-
-        strip_symbols pia-hnsd ""
-        strip_symbols pia-unbound ""
-        ;;
-    mingw*)
-        strip_symbols pia-hnsd .exe
-        strip_symbols pia-unbound .exe
-        ;;
-    macos)
-        # Like on Linux, OpenSSL is dynamically linked - we ship dylibs from desktop-openvpn, but set the
-        # library paths.
-        mac_set_loader_path libssl.1.1.dylib "${artifacts_dir}/pia-unbound"
-        mac_set_loader_path libcrypto.1.1.dylib "${artifacts_dir}/pia-unbound"
-        mac_set_loader_path libssl.1.1.dylib "${artifacts_dir}/pia-hnsd"
-        mac_set_loader_path libcrypto.1.1.dylib "${artifacts_dir}/pia-hnsd"
         ;;
 esac
+
+
+split_exe_symbols "${artifacts_dir}/pia-unbound"
+split_exe_symbols "${artifacts_dir}/pia-hnsd"
 
 popd

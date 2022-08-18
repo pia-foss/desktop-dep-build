@@ -1,4 +1,4 @@
-From 13dccf4fa98e9ff141697b202c70b469ce329792 Mon Sep 17 00:00:00 2001
+From 00aad601ac52baf654647aa8bd46cd70fbd5d6de Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Fri, 5 Jun 2020 14:51:35 -0400
 Subject: [PATCH 1/3] Remove unbound-anchor from default build
@@ -8,10 +8,10 @@ Subject: [PATCH 1/3] Remove unbound-anchor from default build
  1 file changed, 1 insertion(+), 4 deletions(-)
 
 diff --git a/Makefile.in b/Makefile.in
-index a20058c..b4c3c88 100644
+index 55125a44..740269d1 100644
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -279,7 +279,7 @@ LINK_LIB=$(LIBTOOL) --tag=CC --mode=link $(CC) $(RUNTIME_PATH) $(CPPFLAGS) $(CFL
+@@ -307,7 +307,7 @@ LINK_LIB=$(LIBTOOL) --tag=CC --mode=link $(CC) $(RUNTIME_PATH) $(CPPFLAGS) $(CFL
  
  all:	$(COMMON_OBJ) $(ALLTARGET)
  
@@ -20,7 +20,7 @@ index a20058c..b4c3c88 100644
  
  # compat with BSD make, register suffix, and an implicit rule to actualise it.
  .SUFFIXES: .lo
-@@ -503,7 +503,6 @@ strip:
+@@ -548,7 +548,6 @@ strip:
  	$(STRIP) unbound-checkconf$(EXEEXT)
  	$(STRIP) unbound-control$(EXEEXT)
  	$(STRIP) unbound-host$(EXEEXT) || $(STRIP) .libs/unbound-host$(EXEEXT)
@@ -28,7 +28,7 @@ index a20058c..b4c3c88 100644
  
  pythonmod-install:
  	$(INSTALL) -m 755 -d $(DESTDIR)$(PYTHON_SITE_PKG)
-@@ -553,12 +552,10 @@ install-all:	all $(PYTHONMOD_INSTALL) $(PYUNBOUND_INSTALL) $(UNBOUND_EVENT_INSTA
+@@ -598,12 +597,10 @@ install-all:	all $(PYTHONMOD_INSTALL) $(PYUNBOUND_INSTALL) $(UNBOUND_EVENT_INSTA
  	$(LIBTOOL) --mode=install cp -f unbound-checkconf$(EXEEXT) $(DESTDIR)$(sbindir)/unbound-checkconf$(EXEEXT)
  	$(LIBTOOL) --mode=install cp -f unbound-control$(EXEEXT) $(DESTDIR)$(sbindir)/unbound-control$(EXEEXT)
  	$(LIBTOOL) --mode=install cp -f unbound-host$(EXEEXT) $(DESTDIR)$(sbindir)/unbound-host$(EXEEXT)
@@ -42,5 +42,5 @@ index a20058c..b4c3c88 100644
  	$(INSTALL) -c -m 644 doc/unbound-host.1 $(DESTDIR)$(mandir)/man1
  	$(INSTALL) -c -m 755 unbound-control-setup $(DESTDIR)$(sbindir)/unbound-control-setup
 -- 
-2.7.4
+2.30.1 (Apple Git-130)
 

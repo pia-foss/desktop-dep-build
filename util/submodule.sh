@@ -11,12 +11,12 @@ check_submodule_clean() {
 # Create a build directory for a submodule by cloning it, and apply patches if
 # present
 prep_submodule() {
-    # Submodule is a directory name in the current directory (should not be a path,
-    # used to determine build directory names and look for patches
+    # Submodule is a path to the submodule repo.  Patches are found next to that
+    # repo directory in a directory called patch-<repo>.
     local SUBMODULE="$1"
     local BUILD_DIR="$2"
 
-    local MODULE_BUILD_DIR="$BUILD_DIR/$SUBMODULE"
+    local MODULE_BUILD_DIR="$BUILD_DIR/$(basename "$SUBMODULE")"
 
     # For normal full builds, always do the clone.  For rebuilds, do the clone
     # only if this build dir doesn't exist yet.
@@ -24,7 +24,7 @@ prep_submodule() {
         rm -rf "$MODULE_BUILD_DIR"
         cp -r "$SUBMODULE" "$MODULE_BUILD_DIR"
 
-        for p in "patch-$SUBMODULE"/*.patch; do
+        for p in "$(dirname "$SUBMODULE")/patch-$(basename "$SUBMODULE")"/*.patch; do
             [ -f "$p" ] || continue # empty patch dir
             echo "Applying $p"
             patch -p1 -d "$MODULE_BUILD_DIR" < "$p"

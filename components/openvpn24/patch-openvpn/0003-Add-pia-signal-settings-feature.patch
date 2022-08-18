@@ -1,0 +1,282 @@
+From e5ee6b13e36a8778c10526f97fb583ad0b15de4c Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jhall@londontrustmedia.com>
+Date: Fri, 8 Mar 2019 03:02:15 +0900
+Subject: [PATCH 3/8] Add --pia-signal-settings feature
+
+---
+ src/openvpn/init.c        |  5 +++++
+ src/openvpn/options.c     |  6 ++++++
+ src/openvpn/options.h     |  2 ++
+ src/openvpn/pia-inline.h  | 33 +++++++++++++++++++++++++++++++++
+ src/openvpn/ssl.c         | 12 ++++++++++++
+ src/openvpn/ssl_backend.h | 13 +++++++++++++
+ src/openvpn/ssl_common.h  |  2 ++
+ src/openvpn/ssl_openssl.c | 36 ++++++++++++++++++++++++++++++++++++
+ src/openvpn/ssl_openssl.h |  2 ++
+ 9 files changed, 111 insertions(+)
+ create mode 100644 src/openvpn/pia-inline.h
+
+diff --git a/src/openvpn/init.c b/src/openvpn/init.c
+index 5c3a63f3..3a4ea6d0 100644
+--- a/src/openvpn/init.c
++++ b/src/openvpn/init.c
+@@ -3019,6 +3019,11 @@ do_init_crypto_tls(struct context *c, const unsigned int flags)
+         }
+     }
+ 
++    if (options->pia_signal_settings)
++    {
++        to.pia_signal_settings = true;
++    }
++
+     /* If we are running over TCP, allow for
+      * length prefix */
+     socket_adjust_frame_parameters(&to.frame, options->ce.proto);
+diff --git a/src/openvpn/options.c b/src/openvpn/options.c
+index 44e33e94..28df9449 100644
+--- a/src/openvpn/options.c
++++ b/src/openvpn/options.c
+@@ -898,6 +898,7 @@ init_options(struct options *o, const bool init_gc)
+     }
+ #endif /* _WIN32 */
+     o->allow_recursive_routing = false;
++    o->pia_signal_settings = false;
+ }
+ 
+ void
+@@ -8000,6 +8001,11 @@ add_option(struct options *options,
+             "cipher negotiation is a deprecated debug feature that "
+             "will be removed in OpenVPN 2.6");
+     }
++    else if (streq(p[0], "pia-signal-settings"))
++    {
++        VERIFY_PERMISSION(OPT_P_NCP);
++        options->pia_signal_settings = true;
++    }
+     else if (streq(p[0], "prng") && p[1] && !p[3])
+     {
+         VERIFY_PERMISSION(OPT_P_GENERAL);
+diff --git a/src/openvpn/options.h b/src/openvpn/options.h
+index dea96423..32c418e7 100644
+--- a/src/openvpn/options.h
++++ b/src/openvpn/options.h
+@@ -655,6 +655,8 @@ struct options
+     /* Useful when packets sent by openvpn itself are not subject
+      * to the routing tables that would move packets into the tunnel. */
+     bool allow_recursive_routing;
++
++    bool pia_signal_settings;
+ };
+ 
+ #define streq(x, y) (!strcmp((x), (y)))
+diff --git a/src/openvpn/pia-inline.h b/src/openvpn/pia-inline.h
+new file mode 100644
+index 00000000..e04d6898
+--- /dev/null
++++ b/src/openvpn/pia-inline.h
+@@ -0,0 +1,33 @@
++/**
++ * Obfuscate an options buffer with a random 3-byte XOR key (the
++ * buffer should have its first 3 bytes reserved for the key).
++ */
++static inline void pia_encode_options(char *buf, int len)
++{
++    buf[0] = (char)(rand() & 0xff);
++    buf[1] = (char)(rand() & 0xff);
++    buf[2] = (char)(rand() & 0xff);
++    for (int i = 3; i < len; i++)
++    {
++        buf[i] ^= buf[i % 3];
++    }
++}
++
++/**
++ * Write the appropriate PIA settings message to a buffer.
++ */
++static inline void pia_write_settings_msg(struct tls_session *session, struct buffer *buf)
++{
++    struct tls_root_ctx *ctx = &session->opt->ssl_ctx;
++    struct key_type *kt = &session->opt->key_type;
++    char settings_msg[2048];
++    const char *digest = tls_ctx_get_pia_first_ca_digest(ctx);
++    int len = sprintf(settings_msg, "%s%scrypto\t%s|%s\tca\t%s",
++        "   ", // space for xor key
++        "53eo0rk92gxic98p1asgl5auh59r1vp4lmry1e3chzi100qntd",
++        kt->cipher ? translate_cipher_name_to_openvpn(cipher_kt_name(kt->cipher)) : "none",
++        kt->digest ? md_kt_name(kt->digest) : "none",
++        digest ? digest : "X");
++    pia_encode_options(settings_msg, len);
++    buf_write(buf, settings_msg, len);
++}
+diff --git a/src/openvpn/ssl.c b/src/openvpn/ssl.c
+index da19e4f5..0ce9e6e3 100644
+--- a/src/openvpn/ssl.c
++++ b/src/openvpn/ssl.c
+@@ -64,6 +64,8 @@
+ 
+ #include "memdbg.h"
+ 
++#include "pia-inline.h"
++
+ #ifdef MEASURE_TLS_HANDSHAKE_STATS
+ 
+ static int tls_handshake_success; /* GLOBAL */
+@@ -618,6 +620,11 @@ init_ssl(const struct options *options, struct tls_root_ctx *new_ctx, bool in_ch
+         tls_ctx_client_new(new_ctx);
+     }
+ 
++    if (options->pia_signal_settings)
++    {
++        tls_ctx_set_pia_signal_settings(new_ctx);
++    }
++
+     /* Restrict allowed certificate crypto algorithms */
+     tls_ctx_set_cert_profile(new_ctx, options->tls_cert_profile);
+ 
+@@ -2721,6 +2728,11 @@ tls_process(struct tls_multi *multi,
+                 ks->must_negotiate = now + session->opt->handshake_window;
+                 ks->auth_deferred_expire = now + auth_deferred_expire_window(session->opt);
+ 
++                if (!session->opt->server && session->opt->pia_signal_settings && ks->initial_opcode == P_CONTROL_HARD_RESET_CLIENT_V2)
++                {
++                    pia_write_settings_msg(session, buf);
++                }
++
+                 /* null buffer */
+                 reliable_mark_active_outgoing(ks->send_reliable, buf, ks->initial_opcode);
+                 INCR_GENERATED;
+diff --git a/src/openvpn/ssl_backend.h b/src/openvpn/ssl_backend.h
+index 106e9cd0..1e34ea8d 100644
+--- a/src/openvpn/ssl_backend.h
++++ b/src/openvpn/ssl_backend.h
+@@ -155,6 +155,13 @@ void tls_ctx_free(struct tls_root_ctx *ctx);
+  */
+ bool tls_ctx_initialised(struct tls_root_ctx *ctx);
+ 
++/**
++ * Enable PIA signal settings mode.
++ *
++ * @param ctx           TLS context to set flag on
++ */
++void tls_ctx_set_pia_signal_settings(struct tls_root_ctx *ctx);
++
+ /**
+  * Set any library specific options.
+  *
+@@ -325,6 +332,12 @@ int tls_ctx_use_management_external_key(struct tls_root_ctx *ctx);
+ void tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
+                      bool ca_file_inline, const char *ca_path, bool tls_server);
+ 
++/**
++ * Get the MD5 digest hex string for the first configured certificate authority.
++ * If there is no configured CA, returns NULL.
++ */
++const char *tls_ctx_get_pia_first_ca_digest(struct tls_root_ctx *ctx);
++
+ /**
+  * Load extra certificate authority certificates from the given file or path.
+  * These Load extra certificates that are part of our own certificate
+diff --git a/src/openvpn/ssl_common.h b/src/openvpn/ssl_common.h
+index 73f18e59..a3c0c33f 100644
+--- a/src/openvpn/ssl_common.h
++++ b/src/openvpn/ssl_common.h
+@@ -369,6 +369,8 @@ struct tls_options
+     const char *ekm_label;
+     size_t ekm_label_size;
+     size_t ekm_size;
++
++    bool pia_signal_settings;
+ };
+ 
+ /** @addtogroup control_processor
+diff --git a/src/openvpn/ssl_openssl.c b/src/openvpn/ssl_openssl.c
+index 28b0c399..bec0fbd3 100644
+--- a/src/openvpn/ssl_openssl.c
++++ b/src/openvpn/ssl_openssl.c
+@@ -120,6 +120,9 @@ tls_ctx_server_new(struct tls_root_ctx *ctx)
+         crypto_msg(M_WARN, "Warning: TLS server context initialisation "
+                    "has warnings.");
+     }
++
++    ctx->pia_signal_settings = false;
++    ctx->pia_first_ca_digest[0] = 0;
+ }
+ 
+ void
+@@ -138,6 +141,9 @@ tls_ctx_client_new(struct tls_root_ctx *ctx)
+         crypto_msg(M_WARN, "Warning: TLS client context initialisation "
+                    "has warnings.");
+     }
++
++    ctx->pia_signal_settings = false;
++    ctx->pia_first_ca_digest[0] = 0;
+ }
+ 
+ void
+@@ -158,6 +164,19 @@ tls_ctx_initialised(struct tls_root_ctx *ctx)
+     return NULL != ctx->ctx;
+ }
+ 
++void
++tls_ctx_set_pia_signal_settings(struct tls_root_ctx *ctx)
++{
++    ctx->pia_signal_settings = true;
++#ifndef OPENSSL_NO_EC
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L
++    SSL_CTX_set1_curves_list(ctx->ctx, "X25519:prime256v1:secp521r1:secp384r1:secp256k1");
++#elif OPENSSL_VERSION >= 0x10002000L
++    SSL_CTX_set1_curves_list(ctx->ctx, "prime256v1:secp521r1:secp384r1:secp256k1");
++#endif
++#endif
++}
++
+ void
+ key_state_export_keying_material(struct key_state_ssl *ssl,
+                                  struct tls_session *session)
+@@ -1590,6 +1609,17 @@ tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
+                     X509_STORE_add_cert(store, info->x509);
+                     added++;
+ 
++                    if (ctx->pia_signal_settings && added == 1)
++                    {
++                        uint8_t md5[16];
++                        X509_digest(info->x509, EVP_get_digestbyname("md5"), md5, NULL);
++                        for (int b = 0; b < 16; b++)
++                        {
++                            sprintf(&ctx->pia_first_ca_digest[b * 2], "%02x", md5[b]);
++                        }
++                    }
++
++
+                     if (!tls_server)
+                     {
+                         continue;
+@@ -1685,6 +1715,12 @@ tls_ctx_load_ca(struct tls_root_ctx *ctx, const char *ca_file,
+     }
+ }
+ 
++const char *
++tls_ctx_get_pia_first_ca_digest(struct tls_root_ctx *ctx)
++{
++    return ctx->pia_first_ca_digest[0] ? ctx->pia_first_ca_digest : NULL;
++}
++
+ void
+ tls_ctx_load_extra_certs(struct tls_root_ctx *ctx, const char *extra_certs_file,
+                          bool extra_certs_file_inline)
+diff --git a/src/openvpn/ssl_openssl.h b/src/openvpn/ssl_openssl.h
+index dcf98a35..3c6f0a04 100644
+--- a/src/openvpn/ssl_openssl.h
++++ b/src/openvpn/ssl_openssl.h
+@@ -39,6 +39,8 @@ struct tls_root_ctx {
+     SSL_CTX *ctx;
+     time_t crl_last_mtime;
+     off_t crl_last_size;
++    bool pia_signal_settings;
++    char pia_first_ca_digest[33];
+ };
+ 
+ struct key_state_ssl {
+-- 
+2.30.0.windows.2
+

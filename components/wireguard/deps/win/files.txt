@@ -1,4 +1,0 @@
-Files downloaded:
-
-https://dl.google.com/go/go1.15.6.windows-amd64.zip
-

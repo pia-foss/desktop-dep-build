@@ -1,4 +1,4 @@
-From fb724ea092584531563739e84949d8d08b37db97 Mon Sep 17 00:00:00 2001
+From 4561c4db1ac51c83f7ac172c2ffc9e5c1a251177 Mon Sep 17 00:00:00 2001
 From: Jonathon Hall <jhall@londontrustmedia.com>
 Date: Thu, 2 May 2019 16:40:00 -0400
 Subject: [PATCH 2/3] Skip libexpat requirement
@@ -9,22 +9,22 @@ Skip libexpat; not needed when only building libunbound
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
-index 3e00c99..0476e1e 100644
+index 36fdb459..011cd103 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -1324,9 +1324,9 @@ for dir in $withval ; do
+@@ -1377,9 +1377,9 @@ for dir in $withval ; do
                  break;
              fi
  done
 -if test x_$found_libexpat != x_yes; then
--	AC_ERROR([Could not find libexpat, expat.h])
+-	AC_MSG_ERROR([Could not find libexpat, expat.h])
 -fi
 +#if test x_$found_libexpat != x_yes; then
-+#	AC_ERROR([Could not find libexpat, expat.h])
++#	AC_MSG_ERROR([Could not find libexpat, expat.h])
 +#fi
  AC_CHECK_HEADERS([expat.h],,, [AC_INCLUDES_DEFAULT])
  AC_CHECK_DECLS([XML_StopParser], [], [], [AC_INCLUDES_DEFAULT
  #include <expat.h>
 -- 
-2.7.4
+2.30.1 (Apple Git-130)
 

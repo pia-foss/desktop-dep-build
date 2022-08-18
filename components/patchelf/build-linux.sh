@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# Copyright (c) 2021 Private Internet Access, Inc.
+# Copyright (c) 2022 Private Internet Access, Inc.
 #
 # This file is part of the Private Internet Access Desktop Client.
 #
@@ -24,6 +24,8 @@ set -e
 
 cd "$COMPROOT"
 
+source "../../util/platform.sh"
+
 rm -rf out
 mkdir -p out/install
 
@@ -33,3 +35,5 @@ pushd patchelf
 make
 make install
 popd
+
+split_exe_symbols "$COMPROOT/out/install/bin/patchelf"

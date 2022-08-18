@@ -7,6 +7,7 @@ set -e
 cd "$COMPROOT"
 
 source "../../util/submodule.sh"
+source "../../util/platform.sh"
 
 rm -rf out
 mkdir -p out/build
@@ -38,3 +39,17 @@ build_submodule libxcb-image
 build_submodule libxcb-keysyms
 build_submodule libxcb-render-util
 build_submodule libxcb-wm
+
+# Patch rpaths to $ORIGIN/../lib.  As usual, autotools can't handle the $ORIGIN
+# in LDFLAGS; there's no point trying to build this correctly, just patch it
+# after the fact.
+for f in out/install/{bin,lib}/*; do
+    # Skip directories (like out/install/lib/pkgconfig), symlinks (like
+    # out/install/lib/libicuuc.so) and anything else that's not an ELF
+    # (like out/install/bin/icu-config, which is a shell script)
+    if [ -f "$f" ] && [ ! -h "$f" ] && [[ $(file "$f") =~ ELF ]]; then
+        echo "$f"
+        patchelf --set-rpath '$ORIGIN/../lib/' "$f"
+        split_symbols "$f"
+    fi
+done

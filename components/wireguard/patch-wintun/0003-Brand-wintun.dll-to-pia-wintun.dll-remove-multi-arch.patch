@@ -1,0 +1,248 @@
+From c660f06918f701063c8187125b8663fa80e8c8e7 Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jonathon.hall@privateinternetaccess.com>
+Date: Fri, 28 May 2021 15:21:54 -0400
+Subject: [PATCH 3/3] Brand wintun.dll to pia-wintun.dll, remove multi-arch
+ embedding
+
+---
+ api/adapter.c    | 16 ++++++++--------
+ api/adapter.h    |  2 +-
+ api/api.vcxproj  |  8 ++++----
+ api/exports.def  |  2 +-
+ api/namespace.c  | 12 ++++++------
+ api/resources.rc | 33 +++++++++++++--------------------
+ api/rundll32_i.c |  6 +++---
+ 7 files changed, 36 insertions(+), 43 deletions(-)
+
+diff --git a/api/adapter.c b/api/adapter.c
+index 5cc0dad..87a0454 100644
+--- a/api/adapter.c
++++ b/api/adapter.c
+@@ -1179,7 +1179,7 @@ MaybeGetRunningDriverVersion(BOOL ReturnOneIfRunningInsteadOfVersion)
+     for (ULONG i = Modules->NumberOfModules; i-- > 0;)
+     {
+         const char *NtPath = (const char *)Modules->Modules[i].FullPathName;
+-        if (!_stricmp(&NtPath[Modules->Modules[i].OffsetToFileName], "wintun.sys"))
++        if (!_stricmp(&NtPath[Modules->Modules[i].OffsetToFileName], "pia-wintun.sys"))
+         {
+             if (ReturnOneIfRunningInsteadOfVersion)
+             {
+@@ -1324,22 +1324,22 @@ static _Return_type_success_(return != FALSE) BOOL SelectDriver(
+     WCHAR CatPath[MAX_PATH] = { 0 };
+     WCHAR SysPath[MAX_PATH] = { 0 };
+     WCHAR InfPath[MAX_PATH] = { 0 };
+-    if (!PathCombineW(CatPath, RandomTempSubDirectory, L"wintun.cat") ||
+-        !PathCombineW(SysPath, RandomTempSubDirectory, L"wintun.sys") ||
+-        !PathCombineW(InfPath, RandomTempSubDirectory, L"wintun.inf"))
++    if (!PathCombineW(CatPath, RandomTempSubDirectory, L"pia-wintun.cat") ||
++        !PathCombineW(SysPath, RandomTempSubDirectory, L"pia-wintun.sys") ||
++        !PathCombineW(InfPath, RandomTempSubDirectory, L"pia-wintun.inf"))
+     {
+         LastError = ERROR_BUFFER_OVERFLOW;
+         goto cleanupDirectory;
+     }
+ 
+     BOOL UseWHQL = HaveWHQL();
+-    if (!UseWHQL && !InstallCertificate(L"wintun.cat"))
++    if (!UseWHQL && !InstallCertificate(L"pia-wintun.cat"))
+         LOG(WINTUN_LOG_WARN, L"Failed to install code signing certificate");
+ 
+     LOG(WINTUN_LOG_INFO, L"Extracting driver");
+-    if (!ResourceCopyToFile(CatPath, UseWHQL ? L"wintun-whql.cat" : L"wintun.cat") ||
+-        !ResourceCopyToFile(SysPath, UseWHQL ? L"wintun-whql.sys" : L"wintun.sys") ||
+-        !ResourceCopyToFile(InfPath, UseWHQL ? L"wintun-whql.inf" : L"wintun.inf"))
++    if (!ResourceCopyToFile(CatPath, UseWHQL ? L"pia-wintun-whql.cat" : L"pia-wintun.cat") ||
++        !ResourceCopyToFile(SysPath, UseWHQL ? L"pia-wintun-whql.sys" : L"pia-wintun.sys") ||
++        !ResourceCopyToFile(InfPath, UseWHQL ? L"pia-wintun-whql.inf" : L"pia-wintun.inf"))
+     {
+         LastError = LOG_LAST_ERROR(L"Failed to extract driver");
+         goto cleanupDelete;
+diff --git a/api/adapter.h b/api/adapter.h
+index 940330b..e82c4db 100644
+--- a/api/adapter.h
++++ b/api/adapter.h
+@@ -11,7 +11,7 @@
+ #include <Windows.h>
+ 
+ #define MAX_INSTANCE_ID MAX_PATH /* TODO: Is MAX_PATH always enough? */
+-#define WINTUN_HWID L"Wintun"
++#define WINTUN_HWID L"PiaWintun"
+ 
+ void
+ AdapterInit(void);
+diff --git a/api/api.vcxproj b/api/api.vcxproj
+index 5e7d462..1120165 100644
+--- a/api/api.vcxproj
++++ b/api/api.vcxproj
+@@ -96,7 +96,7 @@
+   <PropertyGroup>
+     <OutDir>..\$(Configuration)\$(WintunPlatform)\</OutDir>
+     <IntDir>..\$(Configuration)\$(WintunPlatform)\$(ProjectName)-intermediate\</IntDir>
+-    <TargetName>wintun</TargetName>
++    <TargetName>pia-wintun</TargetName>
+     <CodeAnalysisRuleSet>NativeRecommendedRules.ruleset</CodeAnalysisRuleSet>
+     <RunCodeAnalysis>true</RunCodeAnalysis>
+     <IgnoreImportLibrary>true</IgnoreImportLibrary>
+@@ -189,11 +189,11 @@
+     <SignTargetCommandLine Condition="$(SignMode)=='TestSign'">"$(SignToolPath)" sign /sha1 "$(TestCertificate)" /fd sha256 "$(TargetPath)"</SignTargetCommandLine>
+     <SignTargetCommandLine Condition="$(SignMode)=='ProductionSign'">"$(SignToolPath)" sign /sha1 "$(ProductionCertificate)" /fd sha256 /tr "$(TimeStampServer)" /td sha256 "$(TargetPath)"</SignTargetCommandLine>
+   </PropertyGroup>
+-  <Target Name="BuildInfVersion" BeforeTargets="ClCompile" Inputs="$(OutDir)wintun\wintun.inf" Outputs="$(IntDir)wintun-inf.h">
+-    <Exec Command="cscript.exe /nologo &quot;extract-driverver.js&quot; &lt; &quot;$(OutDir)wintun\wintun.inf&quot; &gt; &quot;$(IntDir)wintun-inf.h&quot;" />
++  <Target Name="BuildInfVersion" BeforeTargets="ClCompile" Inputs="$(OutDir)pia-wintun\pia-wintun.inf" Outputs="$(IntDir)wintun-inf.h">
++    <Exec Command="cscript.exe /nologo &quot;extract-driverver.js&quot; &lt; &quot;$(OutDir)pia-wintun\pia-wintun.inf&quot; &gt; &quot;$(IntDir)wintun-inf.h&quot;" />
+   </Target>
+   <Target Name="CleanInfVersion">
+-    <Delete Files="$(IntDir)wintun-inf.h" />
++    <Delete Files="$(IntDir)pia-wintun-inf.h" />
+   </Target>
+   <Target Name="BuildNci" BeforeTargets="Link" Inputs="$(ProjectDir)nci.def;$(ProjectDir)nci.h" Outputs="$(IntDir)nci.lib">
+     <Exec Command="cl.exe /nologo /DGENERATE_LIB /Ob0 /c /Fo&quot;$(IntDir)nci.obj&quot; /Tc &quot;nci.h&quot;" />
+diff --git a/api/exports.def b/api/exports.def
+index 3539ad8..ff9259e 100644
+--- a/api/exports.def
++++ b/api/exports.def
+@@ -1,4 +1,4 @@
+-LIBRARY wintun.dll
++LIBRARY pia-wintun.dll
+ EXPORTS
+ 	WintunAllocateSendPacket
+ 	WintunCreateAdapter
+diff --git a/api/namespace.c b/api/namespace.c
+index 34ade2c..b41ca97 100644
+--- a/api/namespace.c
++++ b/api/namespace.c
+@@ -66,7 +66,7 @@ static _Return_type_success_(return != FALSE) BOOL NamespaceRuntimeInit(void)
+         goto cleanupBCryptCloseAlgorithmProvider;
+     }
+ 
+-    BoundaryDescriptor = CreateBoundaryDescriptorW(L"Wintun", 0);
++    BoundaryDescriptor = CreateBoundaryDescriptorW(L"PiaWintun", 0);
+     if (!BoundaryDescriptor)
+     {
+         LastError = LOG_LAST_ERROR(L"Failed to create boundary descriptor");
+@@ -80,11 +80,11 @@ static _Return_type_success_(return != FALSE) BOOL NamespaceRuntimeInit(void)
+ 
+     for (;;)
+     {
+-        if ((PrivateNamespace = CreatePrivateNamespaceW(&SecurityAttributes, BoundaryDescriptor, L"Wintun")) != NULL)
++        if ((PrivateNamespace = CreatePrivateNamespaceW(&SecurityAttributes, BoundaryDescriptor, L"PiaWintun")) != NULL)
+             break;
+         if ((LastError = GetLastError()) == ERROR_ALREADY_EXISTS)
+         {
+-            if ((PrivateNamespace = OpenPrivateNamespaceW(BoundaryDescriptor, L"Wintun")) != NULL)
++            if ((PrivateNamespace = OpenPrivateNamespaceW(BoundaryDescriptor, L"PiaWintun")) != NULL)
+                 break;
+             if ((LastError = GetLastError()) == ERROR_PATH_NOT_FOUND)
+                 continue;
+@@ -123,7 +123,7 @@ _Return_type_success_(return != NULL) HANDLE NamespaceTakePoolMutex(_In_z_ const
+         return NULL;
+     }
+     DWORD LastError;
+-    static const WCHAR mutex_label[] = L"Wintun Adapter Name Mutex Stable Suffix v1 jason@zx2c4.com";
++    static const WCHAR mutex_label[] = L"PiaWintun Adapter Name Mutex Stable Suffix v1 privateinternetaccess.com";
+     if (!BCRYPT_SUCCESS(
+             Status = BCryptHashData(Sha256, (PUCHAR)mutex_label, sizeof(mutex_label) /* Including NULL 2 bytes */, 0)))
+     {
+@@ -151,7 +151,7 @@ _Return_type_success_(return != NULL) HANDLE NamespaceTakePoolMutex(_In_z_ const
+         LastError = RtlNtStatusToDosError(Status);
+         goto cleanupPoolNorm;
+     }
+-    static const WCHAR MutexNamePrefix[] = L"Wintun\\Wintun-Name-Mutex-";
++    static const WCHAR MutexNamePrefix[] = L"PiaWintun\\PiaWintun-Name-Mutex-";
+     WCHAR MutexName[_countof(MutexNamePrefix) + sizeof(Hash) * 2];
+     memcpy(MutexName, MutexNamePrefix, sizeof(MutexNamePrefix));
+     for (size_t i = 0; i < sizeof(Hash); ++i)
+@@ -187,7 +187,7 @@ _Return_type_success_(return != NULL) HANDLE NamespaceTakeDriverInstallationMute
+ {
+     if (!NamespaceRuntimeInit())
+         return NULL;
+-    HANDLE Mutex = CreateMutexW(&SecurityAttributes, FALSE, L"Wintun\\Wintun-Driver-Installation-Mutex");
++    HANDLE Mutex = CreateMutexW(&SecurityAttributes, FALSE, L"PiaWintun\\PiaWintun-Driver-Installation-Mutex");
+     if (!Mutex)
+     {
+         LOG_LAST_ERROR(L"Failed to create mutex");
+diff --git a/api/resources.rc b/api/resources.rc
+index 4186db8..323aade 100644
+--- a/api/resources.rc
++++ b/api/resources.rc
+@@ -8,21 +8,14 @@
+ 
+ #pragma code_page(1252)
+ 
+-wintun.cat RCDATA "wintun\\wintun.cat"
+-wintun.inf RCDATA "wintun\\wintun.inf"
+-wintun.sys RCDATA "wintun\\wintun.sys"
++pia-wintun.cat RCDATA "pia-wintun\\pia-wintun.cat"
++pia-wintun.inf RCDATA "pia-wintun\\pia-wintun.inf"
++pia-wintun.sys RCDATA "pia-wintun\\pia-wintun.sys"
+ 
+ #ifdef HAVE_WHQL
+-wintun-whql.cat RCDATA "whql\\wintun.cat"
+-wintun-whql.inf RCDATA "whql\\wintun.inf"
+-wintun-whql.sys RCDATA "whql\\wintun.sys"
+-#endif
+-
+-#if defined(_M_IX86)
+-wintun-amd64.dll RCDATA "amd64\\wintun.dll"
+-#endif
+-#if defined(_M_IX86) || defined(_M_AMD64) || defined(_M_ARM)
+-wintun-arm64.dll RCDATA "arm64\\wintun.dll"
++pia-wintun-whql.cat RCDATA "whql\\pia-wintun.cat"
++pia-wintun-whql.inf RCDATA "whql\\pia-wintun.inf"
++pia-wintun-whql.sys RCDATA "whql\\pia-wintun.sys"
+ #endif
+ 
+ #define STRINGIZE(x) #x
+@@ -39,15 +32,15 @@ BEGIN
+   BEGIN
+     BLOCK "040904b0"
+     BEGIN
+-      VALUE "CompanyName", "WireGuard LLC"
+-      VALUE "FileDescription", "Wintun API Library"
++      VALUE "CompanyName", "Private Internet Access, Inc."
++      VALUE "FileDescription", "PIA Wintun API Library"
+       VALUE "FileVersion", EXPAND(WINTUN_VERSION)
+-      VALUE "InternalName", "wintun.dll"
+-      VALUE "LegalCopyright", "Copyright \xa9 2018-2021 WireGuard LLC. All Rights Reserved."
+-      VALUE "OriginalFilename", "wintun.dll"
+-      VALUE "ProductName", "Wintun Driver"
++      VALUE "InternalName", "pia-wintun.dll"
++      VALUE "LegalCopyright", "Copyright \xa9 2018-2021 WireGuard LLC. All Rights Reserved. Modifications Copyright \xa9 2021 Private Internet Access, Inc."
++      VALUE "OriginalFilename", "pia-wintun.dll"
++      VALUE "ProductName", "PIA Wintun Driver"
+       VALUE "ProductVersion", EXPAND(WINTUN_VERSION)
+-      VALUE "Comments", "https://www.wintun.net/"
++      VALUE "Comments", ""
+     END
+   END
+   BLOCK "VarFileInfo"
+diff --git a/api/rundll32_i.c b/api/rundll32_i.c
+index 01ba6b6..806a9c8 100644
+--- a/api/rundll32_i.c
++++ b/api/rundll32_i.c
+@@ -106,7 +106,7 @@ static _Return_type_success_(return != FALSE) BOOL ExecuteRunDll32(
+         return FALSE;
+     }
+     WCHAR DllPath[MAX_PATH] = { 0 };
+-    if (!PathCombineW(DllPath, RandomTempSubDirectory, L"wintun.dll"))
++    if (!PathCombineW(DllPath, RandomTempSubDirectory, L"pia-wintun.dll"))
+     {
+         LastError = ERROR_BUFFER_OVERFLOW;
+         goto cleanupDirectory;
+@@ -115,10 +115,10 @@ static _Return_type_success_(return != FALSE) BOOL ExecuteRunDll32(
+     switch (NativeMachine)
+     {
+     case IMAGE_FILE_MACHINE_AMD64:
+-        WintunDllResourceName = L"wintun-amd64.dll";
++        WintunDllResourceName = L"pia-wintun-amd64.dll";
+         break;
+     case IMAGE_FILE_MACHINE_ARM64:
+-        WintunDllResourceName = L"wintun-arm64.dll";
++        WintunDllResourceName = L"pia-wintun-arm64.dll";
+         break;
+     default:
+         LOG(WINTUN_LOG_ERR, L"Unsupported platform 0x%x", NativeMachine);
+-- 
+2.31.1.windows.1
+

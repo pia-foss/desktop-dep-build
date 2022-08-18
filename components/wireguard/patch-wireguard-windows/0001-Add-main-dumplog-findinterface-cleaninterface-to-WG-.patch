@@ -1,0 +1,197 @@
+From 54e045b9e8ecfca24aac7ece00f0fc7d3969b32e Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jonathon.hall@privateinternetaccess.com>
+Date: Thu, 27 May 2021 11:55:33 -0400
+Subject: [PATCH 1/3] Add main, /dumplog, /findinterface, /cleaninterface to WG
+ service
+
+---
+ embeddable-dll-service/build.bat |   3 +-
+ embeddable-dll-service/main.go   | 136 +++++++++++++++++++++++++++----
+ 2 files changed, 120 insertions(+), 19 deletions(-)
+
+diff --git a/embeddable-dll-service/build.bat b/embeddable-dll-service/build.bat
+index 0d2cbdbb..be294310 100644
+--- a/embeddable-dll-service/build.bat
++++ b/embeddable-dll-service/build.bat
+@@ -34,8 +34,7 @@ if exist ..\.deps\prepared goto :build
+ 	set GOARCH=%~3
+ 	mkdir %1 >NUL 2>&1
+ 	echo [+] Building library %1
+-	go build -buildmode c-shared -ldflags="-w -s" -trimpath -v -o "%~1/tunnel.dll" || exit /b 1
+-	del "%~1\tunnel.h"
++	go build -ldflags="-w -s" -trimpath -v -o "%~1/wgservice.exe" || exit /b 1
+ 	goto :eof
+ 
+ :error
+diff --git a/embeddable-dll-service/main.go b/embeddable-dll-service/main.go
+index df63034e..017f1921 100644
+--- a/embeddable-dll-service/main.go
++++ b/embeddable-dll-service/main.go
+@@ -3,26 +3,43 @@
+  * Copyright (C) 2019-2021 WireGuard LLC. All Rights Reserved.
+  */
+ 
++/*
++ * This file is derived from wireguard-windows/embeddable-dll-service/main.go
++ * Modifications Copyright (C) 2020 Private Internet Access, Inc., and released under the MIT License.
++ *
++ * The original file has been modified to be built as an executable, and an extra feature to read
++ * diagnostic logs was added.
++ */
++
+ package main
+ 
+ import (
+ 	"C"
+ 
+-	"golang.org/x/crypto/curve25519"
+ 	"golang.org/x/sys/windows"
+ 
++	"golang.zx2c4.com/wireguard/tun/wintun"
+ 	"golang.zx2c4.com/wireguard/windows/conf"
++	"golang.zx2c4.com/wireguard/windows/ringlogger"
+ 	"golang.zx2c4.com/wireguard/windows/tunnel"
+ 
+-	"crypto/rand"
++	"errors"
++	"fmt"
++	"io/ioutil"
+ 	"log"
++	"os"
+ 	"path/filepath"
+-	"unsafe"
+ )
+ 
+-//export WireGuardTunnelService
+-func WireGuardTunnelService(confFile16 *uint16) bool {
+-	confFile := windows.UTF16PtrToString(confFile16)
++const (
++	ExitImproperArgs = -1
++	ExitSuccess      = 0
++	ExitFindError    = 1
++	ExitFindNotFound = 2
++	ExitCleanError   = 1
++)
++
++func WireGuardTunnelService(confFile string) bool {
+ 	conf.PresetRootDirectory(filepath.Dir(confFile))
+ 	tunnel.UseFixedGUIDInsteadOfDeterministic = true
+ 	err := tunnel.Run(confFile)
+@@ -32,18 +49,103 @@ func WireGuardTunnelService(confFile16 *uint16) bool {
+ 	return err == nil
+ }
+ 
+-//export WireGuardGenerateKeypair
+-func WireGuardGenerateKeypair(publicKey *byte, privateKey *byte) {
+-	publicKeyArray := (*[32]byte)(unsafe.Pointer(publicKey))
+-	privateKeyArray := (*[32]byte)(unsafe.Pointer(privateKey))
+-	n, err := rand.Read(privateKeyArray[:])
+-	if err != nil || n != len(privateKeyArray) {
+-		panic("Unable to generate random bytes")
++func WireGuardDumpLogs(confFile string) bool {
++	conf.PresetRootDirectory(filepath.Dir(confFile))
++	err := ringlogger.DumpTo(os.Stdout, false)
++	if err != nil {
++		log.Printf("Error dumping logs: %v", err)
++	}
++
++	return err == nil
++}
++
++func printUsage() {
++	log.Printf("Usage:")
++	log.Printf("  wgservice.exe [path to conf file]")
++	log.Printf("  wgservice.exe [/dumplog] [path to conf file]")
++	log.Printf("  wgservice.exe [/cleaninterface] [ifname]")
++	log.Printf("  wgservice.exe [/findinterface] [ifname] [luidfile]")
++}
++
++var WintunPool, _ = wintun.MakePool("WireGuard")
++
++func mainWithRet() int {
++	if len(os.Args) < 2 {
++		printUsage()
++		return ExitImproperArgs
++	}
++
++	if len(os.Args) == 2 {
++		log.Printf("Running tunnel from file: %s", os.Args[1])
++		WireGuardTunnelService(os.Args[1])
++		return ExitSuccess
+ 	}
+-	privateKeyArray[0] &= 248
+-	privateKeyArray[31] = (privateKeyArray[31] & 127) | 64
+ 
+-	curve25519.ScalarBaseMult(publicKeyArray, privateKeyArray)
++	switch cmd := os.Args[1]; cmd {
++	case "/dumplog":
++		if len(os.Args) != 3 {
++			printUsage()
++			return ExitImproperArgs
++		}
++		log.Printf("Dumping log w/ conf file: %s", os.Args[2])
++		WireGuardDumpLogs(os.Args[2])
++		return ExitSuccess
++	case "/findinterface":
++		if len(os.Args) != 4 {
++			printUsage()
++			return ExitImproperArgs
++		}
++		itf, err := WintunPool.OpenAdapter(os.Args[2])
++		if err != nil {
++			if errors.Is(err, windows.ERROR_OBJECT_NOT_FOUND) {
++				log.Printf("interface not found")
++				return ExitFindNotFound
++			}
++			log.Printf("error finding interface: %s", err.Error())
++			return ExitFindError
++		}
++
++		luidStr := fmt.Sprintf("%d", itf.LUID())
++		log.Printf("interface: %s", luidStr)
++
++		err = ioutil.WriteFile(os.Args[3], []byte(luidStr), 0600)
++		if err != nil {
++			log.Printf("error writing file: %s", err.Error())
++			return ExitFindError
++		}
++
++		return ExitSuccess
++	case "/cleaninterface":
++		if len(os.Args) != 3 {
++			printUsage()
++			return ExitImproperArgs
++		}
++		itf, err := WintunPool.OpenAdapter(os.Args[2])
++		if err != nil {
++			if errors.Is(err, windows.ERROR_OBJECT_NOT_FOUND) {
++				fmt.Printf("success: did not exist")
++				return ExitSuccess
++			} else {
++				fmt.Printf("error: (finding) %s", err.Error())
++				return ExitCleanError
++			}
++		} else {
++			_, err = itf.Delete(true)
++			if err != nil {
++				fmt.Printf("error: (deleting) %s", err.Error())
++				return ExitCleanError
++			} else {
++				fmt.Printf("success: deleted")
++				return ExitSuccess
++			}
++		}
++	default:
++		log.Printf("Unknown argument %s", cmd)
++		printUsage()
++		return ExitImproperArgs
++	}
+ }
+ 
+-func main() {}
++func main() {
++	os.Exit(mainWithRet())
++}
+-- 
+2.31.1.windows.1
+

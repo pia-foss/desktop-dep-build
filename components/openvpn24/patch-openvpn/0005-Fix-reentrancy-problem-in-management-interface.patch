@@ -1,0 +1,36 @@
+From bd86c85a8e8d5a68f1e896c27b30402a6dc63312 Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jhall@londontrustmedia.com>
+Date: Fri, 8 Mar 2019 03:03:17 +0900
+Subject: [PATCH 5/8] Fix reentrancy problem in management interface
+
+---
+ src/openvpn/manage.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/openvpn/manage.c b/src/openvpn/manage.c
+index c831f8a6..c3f4d93b 100644
+--- a/src/openvpn/manage.c
++++ b/src/openvpn/manage.c
+@@ -3188,7 +3188,7 @@ management_io(struct management *man)
+                     net_event_win32_clear_selected_events(&man->connection.ne32, FD_ACCEPT);
+                 }
+             }
+-            else if (man->connection.state == MS_CC_WAIT_READ || man->connection.state == MS_CC_WAIT_WRITE)
++            else if (man->connection.state == MS_CC_WAIT_READ)
+             {
+                 if (net_events & FD_READ)
+                 {
+@@ -3197,7 +3197,9 @@ management_io(struct management *man)
+                     }
+                     net_event_win32_clear_selected_events(&man->connection.ne32, FD_READ);
+                 }
+-
++            }
++            else if (man->connection.state == MS_CC_WAIT_WRITE)
++            {
+                 if (net_events & FD_WRITE)
+                 {
+                     int status;
+-- 
+2.30.0.windows.2
+

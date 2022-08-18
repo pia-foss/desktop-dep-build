@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-# Copyright (c) 2021 Private Internet Access, Inc.
+# Copyright (c) 2022 Private Internet Access, Inc.
 #
 # This file is part of the Private Internet Access Desktop Client.
 #
@@ -25,6 +25,13 @@ __base="$(basename "${BASH_SOURCE[0]}")"
 
 die() { echo "${__base}:" "$*" 1>&2; exit 1; }
 
+cd "${__dir}"
+
+source ../../util/platform.sh
+source ../../util/submodule.sh
+
+JOBS="$(calc_jobs "")"
+
 # Platform-specific arguments to configure or make
 LIBPCRE_CONF_ARGS=()
 LIBSODIUM_CONF_ARGS=()
@@ -33,7 +40,7 @@ LIBEV_CONF_ARGS=()
 SHADOWSOCKS_CONF_ARGS=()
 
 # Arguments to all 'make' commands
-ALL_MAKE_ARGS=(-j2)
+ALL_MAKE_ARGS=("-j$JOBS")
 # CPPFLAGS args (for preprocessor), combined into FLAGS_ARGS after
 # platform-specific values are added.
 # * -DCARES_STATICLIB is needed by c-ares for static libraries, otherwise it
@@ -65,26 +72,22 @@ function apply_mingw_flags() {
 }
 
 # Set platform and platform-specific arguments based on the host platform
-case "$(uname)" in
-    Linux)
-        platform=linux
+case "$PLATFORM" in
+    linux)
         LIBEV_PLATFORM=posix
         # libev requires libm for 'floor'.  We can turn off floor in
         # libev, but we end up linking to libm anyway from another
         # dependency.
         SHADOWSOCKS_CONF_ARGS+=("LIBS=-lm")
         ;;
-    Darwin)
-        platform=macos
+    macos)
         LIBEV_PLATFORM=posix
         ;;
-    MINGW64_NT*)
-        platform=mingw64
+    mingw64)
         LIBEV_PLATFORM=windows
         apply_mingw_flags
         ;;
-    MINGW32_NT*)
-        platform=mingw32
+    mingw32)
         LIBEV_PLATFORM=windows
         apply_mingw_flags
         ;;
@@ -99,9 +102,9 @@ FLAGS_ARGS=()
 FLAGS_ARGS+=("CPPFLAGS=${CPPFLAGS_ARGS}")
 FLAGS_ARGS+=("LDFLAGS=${LDFLAGS_ARGS}")
 
-output_dir="${__dir}/out/build/${platform}"
-artifacts_dir="${__dir}/out/artifacts/${platform}"
-build_dir="${__dir}/build.tmp/${platform}"
+output_dir="${__dir}/out/build/${PLATFORM}"
+artifacts_dir="${__dir}/out/artifacts/${PLATFORM}"
+build_dir="${__dir}/build.tmp/${PLATFORM}"
 
 # For quick iterations on the build script itself, setting REBUILD skips the
 # clean and clone steps for build dirs that already exist.  It does _not_ make
@@ -116,49 +119,17 @@ mkdir -p "${output_dir}"
 mkdir -p "${artifacts_dir}"
 mkdir -p "${build_dir}"
 
-# Local changes would be ignored due to clones below; make sure submodules are clean
-check_submodule_clean() {
-    local module="$1"
-    local subdir="$2${2:+/}"
-    git -C "./${subdir}${module}" diff-index --quiet HEAD -- || die "${subdir}${module} submodule is not clean, commit or revert changes before building"
-}
-
-# Create a build directory for a submodule by cloning it, and apply patches if
-# present
-prep_submodule() {
-    local module="$1"
-    # If $2 is passed, it's a path to the directory that contains the submodule
-    # directory and patch directory.  (Otherwise they're in the repo root.)
-    # This is only needed if different versions of the same submodule are
-    # needed, such as if different branches/patches are needed for different
-    # platforms.
-    local subdir="$2${2:+/}"
-    local module_build_dir="${build_dir}/${module}"
-
-    # For normal full builds, always do the clone.  For rebuilds, do the clone
-    # only if this build dir doesn't exist yet.
-    if [ -z "${REBUILD}" ] || [ ! -d "${module_build_dir}" ]; then
-        git clone --recursive "./${subdir}${module}" "${module_build_dir}" || die "Could not create build directory for ${subdir}${module}"
-
-        for p in "${__dir}/${subdir}patch-${module}"/*.patch; do
-            [ -f "$p" ] || continue # empty patch dir
-            echo "+ Applying $p..."
-            git -C "${module_build_dir}" am "$p"
-        done
-    fi
-}
-
 check_submodule_clean libsodium
 check_submodule_clean mbedtls
 check_submodule_clean c-ares
-check_submodule_clean libev "libev-${LIBEV_PLATFORM}"
+check_submodule_clean "libev-${LIBEV_PLATFORM}/libev"
 check_submodule_clean shadowsocks-libev
 
-prep_submodule libsodium
-prep_submodule mbedtls
-prep_submodule c-ares
-prep_submodule libev "libev-${LIBEV_PLATFORM}"
-prep_submodule shadowsocks-libev
+prep_submodule libsodium "${build_dir}"
+prep_submodule mbedtls "${build_dir}"
+prep_submodule c-ares "${build_dir}"
+prep_submodule "libev-${LIBEV_PLATFORM}/libev" "${build_dir}"
+prep_submodule shadowsocks-libev "${build_dir}"
 
 # Configure args for shadowsocks-libev specifying all the libraries we build
 SHADOWSOCKS_WITH_ARGS=()
@@ -222,27 +193,7 @@ popd
 # Copy ss-local to artifacts
 cp "${output_dir}/shadowsocks-libev/bin/ss-local" "${artifacts_dir}/pia-ss-local"
 
-function strip_symbols() {
-    local BASE=$1
-    local EXT=$2
-
-    # Strip debugging symbols from hnsd, but keep a full copy in case it's
-    # needed for debugging
-    cp "${artifacts_dir}/${BASE}${EXT}" "${artifacts_dir}/${BASE}.full${EXT}"
-    strip --strip-debug "${artifacts_dir}/${BASE}${EXT}"
-    objcopy --add-gnu-debuglink="${artifacts_dir}/${BASE}.full${EXT}" "${artifacts_dir}/${BASE}${EXT}"
-}
-
-case $platform in
-    linux*)
-        strip_symbols "pia-ss-local" ""
-        ;;
-    mingw*)
-        strip_symbols "pia-ss-local" ".exe"
-        ;;
-    macos)
-        ;;
-esac
+split_exe_symbols "${artifacts_dir}/pia-ss-local"
 
 echo "Artifacts produced:"
 ls -alh "${artifacts_dir}"

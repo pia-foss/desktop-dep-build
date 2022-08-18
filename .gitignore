@@ -2,8 +2,13 @@ out/
 # On Windows, qt builds to <repo>/_qt (instead of components/qt/out/build/) to minimize file path lengths
 _qt/
 build.tmp/
+build-*/
 .DS_Store
 .deps/
 build/
 *.kdev4
 *.kate-swp
+.vs/
+# WinTUN signed driver inputs for API build
+components/wireguard/wintun-signed
+

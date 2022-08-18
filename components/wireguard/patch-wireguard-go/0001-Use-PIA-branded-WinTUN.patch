@@ -1,0 +1,25 @@
+From 0e80a89acdf7e92c535e94e6acd0616f830d2b86 Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jonathon.hall@privateinternetaccess.com>
+Date: Fri, 28 May 2021 16:29:36 -0400
+Subject: [PATCH 1/2] Use PIA-branded WinTUN
+
+---
+ tun/wintun/wintun_windows.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tun/wintun/wintun_windows.go b/tun/wintun/wintun_windows.go
+index 6c5a00d..6eb598b 100644
+--- a/tun/wintun/wintun_windows.go
++++ b/tun/wintun/wintun_windows.go
+@@ -34,7 +34,7 @@ type Adapter struct {
+ }
+ 
+ var (
+-	modwintun = newLazyDLL("wintun.dll", setupLogger)
++	modwintun = newLazyDLL("pia-wintun.dll", setupLogger)
+ 
+ 	procWintunCreateAdapter           = modwintun.NewProc("WintunCreateAdapter")
+ 	procWintunDeleteAdapter           = modwintun.NewProc("WintunDeleteAdapter")
+-- 
+2.30.0.windows.2
+

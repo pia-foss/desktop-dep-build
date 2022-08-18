@@ -13,113 +13,200 @@ source util/platform.sh
 OUT="$ROOT/out/${PLATFORM}_$ARCH"
 ARTIFACTS="$OUT/artifacts"
 
-rm -rf "$OUT"
-mkdir -p "$ARTIFACTS"
+# Each "build component" specifies:
+# - 'build' - Whether it is currently being built ('y' or 'n')
+# - 'defbuild' - Whether it is built by default when unspecified
+# - 'deps' - The other components it depends on
+# - 'note' - An extra note for the help text
+#
+# Bash 3 on macOS lacks associative arrays, so each of these maps are
+# emulated with discrete variables of the form "COMP_<property>_<compname>"
 
-# Map of all build components to 'y' or 'n' indicating whether they're being
-# built.
-# Bash 3 on macOS lacks associative arrays, so emulate one with discrete
-# variables of the form "BUILD_COMP_<name>"
-function get_build_comp() {
-    VAR="BUILD_COMP_$1"
+function set_propmap() {
+    local MAP="$1" # Map name ("COMP")
+    local PROP="$2" # Property name ("build", "note", etc.)
+    local KEY="$3" # Key name (a component name)
+    local VALUE="$4"
+
+    printf -v "${MAP}_${PROP}_${KEY}" "%s" "$VALUE"
+}
+function get_propmap() {
+    local MAP="$1" # Map name ("COMP")
+    local PROP="$2" # Property name ("build", "note", etc.)
+    local KEY="$3" # Key name (a component name)
+    local VAR="${MAP}_${PROP}_${KEY}"
     echo "${!VAR}"
 }
+
+# Define a component.  Initially all components are set not to build, defaults
+# are applied by set_default_build
+COMPONENTS=()
+function define_component() {
+    local NAME="$1"
+    local DEFBUILD="$2"
+    local DEPS="$3" # Space-delimited
+    local NOTE="$4"
+
+    set_propmap COMP build "$NAME" n
+    set_propmap COMP defbuild "$NAME" "$DEFBUILD"
+    set_propmap COMP deps "$NAME" "$DEPS"
+    set_propmap COMP note "$NAME" "$NOTE"
+    COMPONENTS+=("$NAME")
+}
+
 function should_build() {
-    if [ "$(get_build_comp "$1")" = 'y' ]; then
+    if [ "$(get_propmap COMP build "$1")" = 'y' ]; then
         return 0
     fi
     return 1
 }
 
 function is_component() {
-    if [ -n "$(get_build_comp "$1")" ]; then
+    if [ -n "$(get_propmap COMP build "$1")" ]; then
         return 0
     fi
     return 1
 }
 
 function set_build() {
-    COMP="$1"
-    VAL="$2"
-    printf -v "BUILD_COMP_$COMP" "%s" "$VAL"
+    set_propmap COMP build "$1" "$2"
 }
 
-set_build patchelf "n" # Linux only
-set_build openvpn "n" # Includes OpenSSL
-set_build unbound "n" # Includes hnsd
-set_build shadowsocks "n"
-set_build wireguard "n"
-set_build xcb "n" # Linux only
-set_build qt "n" # Linux only, includes libicu
-
-function set_default_build() {
-    set_build openvpn "y"
-    set_build unbound "y"
-    set_build shadowsocks "y"
-    set_build wireguard "y"
-
-    if [ "$PLATFORM" == "linux" ]; then
-        set_build patchelf "y"
-        set_build xcb "y"
-        set_build qt "y"
+function linux_only() {
+    if [ "$PLATFORM" = "linux" ]; then
+        echo "$@"
     fi
 }
 
+LINUX_DEFBUILD="$(select_platform n n y)"
+LINUX_PATCHELF="$(select_platform '' '' patchelf)"
+POSIX_DEFBUILD="$(select_platform n y y)"
+
+#                Name           Default build       Dependencies                    Note for help text
+define_component patchelf       "$LINUX_DEFBUILD"   ""                              "(Linux only)"
+define_component openssl        "y"                 "$LINUX_PATCHELF"               ""
+define_component openvpn        "y"                 "$LINUX_PATCHELF openssl"       ""
+define_component unbound        "y"                 "$LINUX_PATCHELF openssl"       "(includes hnsd)"
+define_component shadowsocks    "y"                 "$LINUX_PATCHELF"               ""
+define_component wireguard      "$POSIX_DEFBUILD"   "$LINUX_PATCHELF"               "(macOS and Linux only)"
+define_component xcb            "$LINUX_DEFBUILD"   "$LINUX_PATCHELF"               "(Linux only)"
+define_component icu            "$LINUX_DEFBUILD"   "$LINUX_PATCHELF"               "(Linux only)"
+define_component qt             "$POSIX_DEFBUILD"   "$LINUX_PATCHELF openssl $(linux_only xcb icu)"   "(macOS and Linux only)"
+
+function set_default_build() {
+    for comp in "${COMPONENTS[@]}"; do
+        set_build "$comp" "$(get_propmap COMP defbuild "$comp")"
+    done
+}
+
 function show_usage() {
-    echo "usage:"
-    echo "  Build everything:"
-    echo "    $0"
-    echo "  Skip specific components ('--skip qt' skips Qt):"
-    echo "    $0 --skip <component> [<component>...]"
-    echo "  Build only specific components:"
-    echo "    $0 --build <component> [<component>...]"
-    echo "  Show help:"
-    echo "    $0 --help"
+cat << USAGE_END
+usage:
+  Build everything:
+    $0
+  Skip specific components ('--skip qt' skips Qt):
+    $0 --skip <component> [<component>...]
+  Build only specific components:
+    $0 --build <component> [<component>...]
+  Show help:
+    $0 --help
+
+Builds external dependencies for PIA Desktop.  Artifacts are placed in
+out/artifacts.
+
+Components:
+USAGE_END
+
+    for comp in "${COMPONENTS[@]}"; do
+        echo "  $comp $(get_propmap COMP note "$comp")"
+    done
     echo ""
-    echo "Builds external dependencies for PIA Desktop.  Artifacts are placed"
-    echo "in out/artifacts."
-    echo ""
-    echo "Components:"
-    echo "  patchelf (Linux only)"
-    echo "  openvpn (includes OpenSSL)"
-    echo "  unbound (includes hnsd)"
-    echo "  shadowsocks"
-    echo "  wireguard"
-    echo "  xcb (Linux only)"
-    echo "  qt (Linux only, includes libicu, requires patchelf/openvpn/xcb)"
-    echo ""
-    echo "Parameters:"
-    echo "  --build <component> [<component>...]: Build only the specified"
-    echo "    components.  Note that patchelf is needed for most builds on"
-    echo "    Linux.  Qt depends on OpenSSL from the OpenVPN build and libxcb."
-    echo "    If dependencies aren't specified, it's assumed that they were"
-    echo "    already built."
-    echo "  --skip <component> [<component>...]: Build everything except the"
-    echo "    specified components.  Like with --build, dependencies that are"
-    echo "    excluded are assumed to have already been built."
-    echo ""
-    echo "---Binary artifacts---"
-    echo ""
-    echo "  On all platforms, OpenVPN, OpenSSL, resolvers, Shadowsocks, and"
-    echo "  WireGuard are built to binary artifacts that can be shipped with"
-    echo "  PIA.  These artifacts go in pia_desktop/deps/built/$PLATFORM/$ARCH."
-    echo ""
-    echo "---Qt---"
-    echo ""
-    echo "  On Linux only, Qt is built to a self-extracting archive that can be"
-    echo "  installed to build PIA.  The resulting package is similar to the"
-    echo "  official Qt offline installers; it includes headers, libraries, and"
-    echo "  build tools."
-    echo ""
-    echo "  libicu is also built and included in the Qt installer.  Qt is"
-    echo "  configured for OpenSSL 1.1 (built by the OpenVPN build scripts)."
-    echo "  OpenSSL is located dynamically by Qt at runtime, so this is not"
-    echo "  included in the Qt installer."
-    echo ""
-    echo "  patchelf 0.11 is also built and included.  This is not directly"
-    echo "  related to Qt but is used by PIA for Qt deployment on Linux, and"
-    echo "  the version of patchelf included in Debian Stretch / Ubuntu 18.04"
-    echo "  causes problems with strip (https://github.com/NixOS/patchelf/issues/10)"
+
+cat << USAGE_END
+Parameters:"
+  --build <component> [<component>...]: Build only the specified
+    components.  Note that patchelf is needed for most builds on
+    Linux.  Qt depends on OpenSSL from the OpenVPN build and libxcb.
+    If dependencies aren't specified, it's assumed that they were
+    already built.
+  --skip <component> [<component>...]: Build everything except the
+    specified components.  Like with --build, dependencies that are
+    excluded are assumed to have already been built.
+
+---Binary artifacts---
+
+  On all platforms, OpenVPN, OpenSSL, resolvers, Shadowsocks, and
+  WireGuard are built to binary artifacts that can be shipped with
+  PIA.  These artifacts go in pia_desktop/deps/built/$PLATFORM/$ARCH.
+
+---Qt---
+
+  On Linux and macOS, Qt is built to a self-extracting archive that can be
+  installed to build PIA.  The resulting package is similar to the
+  official Qt offline installers; it includes headers, libraries, and
+  build tools.
+
+  libicu is also built and included in the Qt installer.  Qt is
+  configured for OpenSSL 1.1 (built by the OpenVPN build scripts).
+  OpenSSL is located dynamically by Qt at runtime, so this is not
+  included in the Qt installer.
+
+  patchelf 0.11 is also built and included.  This is not directly
+  related to Qt but is used by PIA for Qt deployment on Linux, and
+  the version of patchelf included in Debian Stretch / Ubuntu 18.04
+  causes problems with strip (https://github.com/NixOS/patchelf/issues/10)
+
+USAGE_END
+case "$PLATFORM" in
+mingw*)
+cat << USAGE_END
+---Windows---
+
+  Build once from the MinGW 64-bit shell for 64-bit artifacts, and once from the
+  MinGW 32-bit shell for 32-bit artifacts.
+
+  WireGuard components for Windows are not built by this script due to code
+  signing requirements (EV CS signing and WHQL); see
+  components/wireguard/README.md.
+
+USAGE_END
+;;
+macos)
+cat << USAGE_END
+---macOS---
+
+  To build universal artifacts, including universal Qt:
+    1. Build once from an x86_64 host
+    2. Build once from an arm64 host
+    3. Copy out/macos_<arch> to the same machine (i.e. copy out/macos_x86_64 to
+       the arm64 host or vice versa)
+    4. Run ./merge-macos-universal.sh to merge the artifacts
+
+  The combined artifacts are placed in out/macos_universal.  Cross builds are
+  not supported, each build must be performed natively.
+
+  Note that Qt is very sensitive to libraries present on the host, it is
+  recommended not to install any other homebrew packages other than the ones
+  specifically needed.  (Specifically, many homebrew packages indirectly install
+  libxcb on macOS, which can cause some Qt modules to pick up a dependency on
+  libxcb, even if -no-xcb is passed to Qt's configure script.)
+
+USAGE_END
+;;
+linux)
+cat << USAGE_END
+---Linux---
+
+  Build in a chroot with the correct dependencies to ensure that the build is
+  compatible with older distributions, and to ensure Qt does not pick up any
+  additional unintended library dependencies.  Setup scripts are in the desktop
+  repo (https://github.com/pia-foss/desktop/tree/master/scripts/chroot).
+
+  Cross builds are not supported, builds for x86_64, arm64, and armhf must each
+  be performed on natively.
+
+USAGE_END
+esac
 }
 
 # What to do when a component name is observed on the command line
@@ -167,23 +254,19 @@ while [ "$#" -ge 1 ]; do
 done
 
 if [ "$CLI_COMPONENT_MODE" = "default" ]; then
+    # We can only clean the output directory if we are building everything,
+    # otherwise we may be reusing prior build output for some components
+    rm -rf "$OUT"
     set_default_build
 fi
-
-function print_build() {
-    if should_build "$1"; then
-        echo "  $1"
-    fi
-}
+mkdir -p "$ARTIFACTS"
 
 echo "Building for $PLATFORM $ARCH:"
-print_build patchelf
-print_build openvpn
-print_build unbound
-print_build shadowsocks
-print_build wireguard
-print_build xcb
-print_build qt
+for comp in "${COMPONENTS[@]}"; do
+    if should_build "$comp"; then
+        echo "  $comp"
+    fi
+done
 echo ""
 
 function first() {
@@ -206,22 +289,33 @@ function glob_any() {
 # Check build dependencies - warn if we're building a dependant but not a
 # dependency, this is OK for testing but the final build should usually be
 # rebuilt to ensure everything is up to date
+for dep in "${COMPONENTS[@]}"; do
+    if ! should_build "$dep"; then
+        # Check if anything being built uses this component
+        WARNED=
+        for parent in "${COMPONENTS[@]}"; do
+            if ! should_build "$parent"; then
+                continue    # Not being built, don't care about deps
+            fi
+            # This parent is being built, see if it depends on this component
+            # Intentional word-split of space-delimited dependencies
+            for parent_dep in $(get_propmap COMP deps "$parent"); do
+                if [ "$parent_dep" = "$dep" ]; then
+                    echo "WARNING: using prior build output for $dep" >&2
+                    WARNED=y
+                    break # Skip rest of dependencies
+                fi
+            done
+            # Skip checking other parents if we already found it in use
+            if [ -n "$WARNED" ]; then
+                break
+            fi
+        done
+    fi
+done
 
-# patchelf is used for nearly everything on Linux
-if [ "$PLATFORM" == "linux" ] && ! should_build patchelf; then
-    echo "WARNING: using prior build output for patchelf dependency" >&2
-fi
-# Qt uses OpenSSL from the OpenVPN build and libxcb
-if should_build qt; then
-    if ! should_build openvpn; then
-        echo "WARNING: using prior build output for OpenSSL dependency" >&2
-    fi
-    if ! should_build xcb; then
-        echo "WARNING: using prior build output for libxcb dependency" >&2
-    fi
-fi
+
 echo ""
-
 if should_build patchelf; then
     echo "===Build patchelf==="
     pushd components/patchelf
@@ -234,28 +328,44 @@ if [ "$PLATFORM" == "linux" ]; then
     export PATH="$PATCHELF_BIN:$PATH"
 fi
 
-if should_build openvpn; then
-    echo "===Build OpenVPN and OpenSSL==="
-    pushd components/openvpn24
+if should_build openssl; then
+    echo "===Build OpenSSL==="
+    pushd components/openssl
     ./build-posix.sh
     popd
 
-    if [ "$PLATFORM" == "linux" ]; then
-        # OpenVPN artifacts have bin/lib subdirectories on Linux
-        # Use -d to preserve versioned symlinks for libs
-        cp -d "components/openvpn24/out/artifacts/$PLATFORM"/{bin,lib}/* "$ARTIFACTS"
-    else
-        cp "components/openvpn24/out/artifacts/$PLATFORM"/* "$ARTIFACTS"
-    fi
+    # Only the shared libraries are installed
+    case "$PLATFORM" in
+        linux)
+            # Use cp -d to preserve versioned symlinks
+            cp -d "components/openssl/out/artifacts/$PLATFORM/lib"/*.so* "$ARTIFACTS"
+            ;;
+        macos)
+            # cp lacks -d on macOS, but we don't need the versioned symlinks anyway on macOS
+            cp "components/openssl/out/artifacts/$PLATFORM/lib"/lib{crypto,ssl}.1.1.dylib "$ARTIFACTS"
+            ;;
+        mingw*)
+            cp "components/openssl/out/artifacts/$PLATFORM/bin"/lib{crypto,ssl}-1_1*.dll "$ARTIFACTS"
+            ;;
+    esac
+fi
+
+if should_build openvpn; then
+    echo "===Build OpenVPN and OpenSSL==="
+    pushd components/openvpn24
+    ./build-posix.sh "$ROOT/components/openssl/out/artifacts/$PLATFORM"
+    popd
+
+    cp "$(exe_name "components/openvpn24/out/artifacts/pia-openvpn")" "$ARTIFACTS/"
 fi
 
 if should_build unbound; then
     echo "===Build Unbound and hnsd==="
     pushd components/hnsd
-    ./build-posix.sh
+    ./build-posix.sh "$ROOT/components/openssl/out/artifacts/$PLATFORM"
     popd
     # Collect artifacts
-    cp "components/hnsd/out/artifacts/$PLATFORM"/* "$ARTIFACTS"
+    cp "$(exe_name "components/hnsd/out/artifacts/$PLATFORM/pia-unbound")" "$ARTIFACTS/"
 fi
 
 if should_build shadowsocks; then
@@ -264,17 +374,16 @@ if should_build shadowsocks; then
     ./build-posix.sh
     popd
     # Collect artifacts
-    cp "components/shadowsocks/out/artifacts/$PLATFORM"/* "$ARTIFACTS"
+    cp "$(exe_name "components/shadowsocks/out/artifacts/$PLATFORM/pia-ss-local")" "$ARTIFACTS/"
 fi
 
 if should_build wireguard; then
     echo "===Build WireGuard==="
     pushd components/wireguard
-    eval "$(select_platform N/A ./scripts/build-mac.sh ./scripts/build-linux.sh)"
+    ./scripts/build-posix.sh
     popd
     # Collect artifacts
-    cp "components/wireguard/out/artifacts"/* "$ARTIFACTS"
-    mv "$ARTIFACTS/wireguard-go" "$ARTIFACTS/pia-wireguard-go"
+    cp "components/wireguard/out/artifacts"/* "$ARTIFACTS/"
 fi
 
 if should_build xcb; then
@@ -287,27 +396,32 @@ if should_build xcb; then
     cp -d "components/xcb/out/install/lib/"*.so* "$ARTIFACTS"
 fi
 
-# ICU and Qt are only built on Linux and can be skipped with --skip qt
+if should_build icu; then
+    echo "===Build ICU==="
+    pushd components/icu
+    ./build-linux.sh
+    popd
+    # icu artifacts are bundled with Qt
+fi
+
 if should_build qt; then
-    echo "===Build ICU and Qt==="
+    echo "===Build Qt==="
     pushd components/qt
-    # Use the copy of OpenSSL built by OpenVPN, use the xcb libraries built
-    # above, and include patchelf in the Qt bundle
-    time ./build-linux.sh '--extra-bin' "$PATCHELF_BIN/patchelf" \
-        "../../components/openvpn24/out/build/$PLATFORM/openvpn" \
-        "../../components/xcb/out/install"
+
+    # Use OpenSSL and libxcb built above, and include patchelf in the Qt
+    # bundle
+    BUILD_ARGS=('--extra-prefix' "../../components/openssl/out/artifacts/$PLATFORM")
+    if [ "$PLATFORM" = "linux" ]; then
+        BUILD_ARGS+=('--extra-bin' "$PATCHELF_BIN/patchelf" \
+            '--extra-prefix' "../../components/xcb/out/install" \
+            '--extra-install' "../../components/icu/out/install")
+    fi
+
+    time ./build-linux.sh "${BUILD_ARGS[@]}"
+
     popd
 
     QT_PACKAGE="$(first "components/qt/out/artifacts"/qt-*.run)"
     mkdir -p "$OUT/installers"
     mv "$QT_PACKAGE" "$OUT/installers"
-fi
-
-
-# Separate unstripped binaries on Linux (stripping isn't done on macOS)
-if [ "$PLATFORM" != "macos" ]; then
-    mkdir -p "$OUT/debug"
-    if glob_any "$ARTIFACTS"/*.full; then
-        mv "$ARTIFACTS"/*.full "$OUT/debug"
-    fi
 fi

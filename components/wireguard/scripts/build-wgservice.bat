@@ -5,88 +5,64 @@ rem SPDX-License-Identifier: MIT
 rem Copyright (C) 2019 WireGuard LLC. All Rights Reserved.
 rem Modifications Copyright (C) 2020 Private Internet Access, Inc., and released under the MIT License. 
 
-setlocal
-set BUILDDIR=%~dp0..
+setlocal EnableDelayedExpansion
+set COMPDIR=%~dp0..
 set PATHEXT=.exe
-cd /d %BUILDDIR% || exit /b 1
+cd /d %COMPDIR% || exit /b 1
 
-REM clear existing wgservice, thus preventing any git issues
-rmdir /s /q %BUILDDIR%\wireguard-windows\wgservice 2> NUL
+set BUILD=.\build-wgservice
+rmdir /Q /S %BUILD% 2>NUL
+mkdir %BUILD%
 
-git submodule init
-git submodule update
+rem Set up wireguard-windows and wireguard-go
+rem Check that repos are clean
+call ..\..\util\prep_submodule.bat check .\wireguard-windows || goto error
+call ..\..\util\prep_submodule.bat check .\wireguard-go || goto error
+rem Clone and patch
+call ..\..\util\prep_submodule.bat prep .\wireguard-windows %BUILD%\wireguard-windows patch-wireguard-windows || goto error
+call ..\..\util\prep_submodule.bat prep .\wireguard-go %BUILD%\wireguard-go patch-wireguard-go || goto error
 
-mkdir out
-mkdir out\artifacts
-mkdir out\artifacts\x86
-mkdir out\artifacts\x86_64
+rem wireguard-windows' build scripts expect deps to be set up here
+rem Don't rely on it downloading binary deps, these tend to disappear over
+rem time which prevents us from reproducing the current build
+set DEPS=%BUILD%\wireguard-windows\.deps
 
-
-REM path
-set DEPS=%BUILDDIR%\.deps\
-
-REM path to embeddable dll service folder
-set EDSPATH=%BUILDDIR%\wgservice\
-
-set ARTIFACTSPATH=%BUILDDIR%\out\artifacts
-
-if exist %DEPS%\prepared goto :build
-:installdeps
-	rmdir /s /q %DEPS% 2> NUL
-	mkdir %DEPS% || goto :error
-	cd %DEPS% || goto :error
-	call :setup go.zip  || goto :error
-	rem Mirror of https://musl.cc/i686-w64-mingw32-native.zip
-	call :download mingw-x86.zip https://download.wireguard.com/windows-toolchain/distfiles/i686-w64-mingw32-native-20190903.zip dfb297cc86c4a4c12eedaeb0a89dff2e1cfa9afacfb9c32690dd23ca7726560a || goto :error
-	rem Mirror of https://musl.cc/x86_64-w64-mingw32-native.zip
-	call :download mingw-amd64.zip https://download.wireguard.com/windows-toolchain/distfiles/x86_64-w64-mingw32-native-20190903.zip 15cf5596ece5394be0d71c22f586ef252e0390689ef6526f990a262f772aecf8 || goto :error
-	copy /y NUL prepared > NUL || goto :error
-	cd .. || goto :error
-
-:build
-  rmdir /s /q %BUILDDIR%\wireguard-windows\wgservice\ 2> NUL
-  mkdir %BUILDDIR%\wireguard-windows\wgservice\
-  copy %BUILDDIR%\wgservice\wgservice.go %BUILDDIR%\wireguard-windows\wgservice\wgservice.go
-
-  cd %BUILDDIR%\wireguard-windows\wgservice\
-  set GOOS=windows
-	set GOPATH=%DEPS%\gopath
-	set GOROOT=%DEPS%\go
-	set CGO_ENABLED=1
-	set CGO_CFLAGS=-O3 -Wall -Wno-unused-function -Wno-switch -std=gnu11 -DWINVER=0x0601
-	call :build_plat x86 i686 386 || goto :error
-	call :build_plat x86_64 x86_64 amd64 || goto :error
-  goto :success
-
-:download
-	echo [+] Downloading %1
-	curl -#fLo %1 %2 || exit /b 1
-	echo [+] Verifying %1
-	for /f %%a in ('CertUtil -hashfile %1 SHA256 ^| findstr /r "^[0-9a-f]*$"') do if not "%%a"=="%~3" exit /b 1
+rem Install deps
+mkdir %DEPS% || goto :error
+pushd %DEPS% || goto :error
+for %%i in (%COMPDIR%\deps\win\*.zip) do (
 	echo [+] Extracting %1
-	tar -xf %1 %~4 || exit /b 1
-	echo [+] Cleaning up %1
-	del %1 || exit /b 1
-	goto :eof
+	"C:\Program Files\7-Zip\7z.exe" x "%%i" || goto error
+)
+rem Indicate that deps are set up (prevents build.bat from doing any setup)
+echo "" > prepared
+popd
 
-:build_plat
-  set PATH=%DEPS%\go\bin;%DEPS%\%~2-w64-mingw32-native\bin;%PATH%
-	set CC=%~2-w64-mingw32-gcc
-	set GOARCH=%~3
-	mkdir %1 >NUL 2>&1
-	echo [+] Building library %1
-	go build -ldflags="-w -s" -v -o "../../out/artifacts/%~1/wgservice.exe" || exit /b 1
-	goto :eof
-  
+rem Extract vendored Go modules
+rem
+rem The Go module dependencies have been vendored to ensure that we can still
+rem rebuild this version of pia-wgservice even if the dependencies are taken
+rem down (which has happened in the past).
+rem
+rem The vendor directory in the archive was created with "go mod vendor -v" from
+rem the prepared wireguard-windows submodule (with patches applied).  The
+rem UI-related directories were deleted (manager, ui, updater, main.go) -
+rem otherwise go mod will pick them up and re-add the win/walk dependencies that
+rem we patched out.
+pushd %BUILD%\wireguard-windows
+"C:\Program Files\7-Zip\7z.exe" x "%COMPDIR%\vendor-win.zip" || goto error
+rmdir /Q /S "vendor\golang.zx2c4.com\wireguard"
+move "..\wireguard-go" "vendor\golang.zx2c4.com\wireguard"
+dir vendor
+dir vendor\golang.zx2c4.com
+popd
+
+call %BUILD%\wireguard-windows\embeddable-dll-service\build.bat || goto error
+
 :success
-	echo [+] Success. 
-	exit /b 0
-
-:setup
-	echo [+] Extracting %1
-	"C:\Program Files\7-Zip\7z.exe" x "%BUILDDIR%\deps\win\%1" || exit /b 1
-	goto :eof
-
+goto :end
 :error
-	echo [-] Failed with error #%errorlevel%.
-	cmd /c exit %errorlevel%
+echo [-] Failed with error #%errorlevel%.
+exit /b %errorlevel%
+:end
+exit /b 0

@@ -1,0 +1,11 @@
+diff -ur orig/qtbase/src/plugins/platforms/cocoa/qiosurfacegraphicsbuffer.h new/qtbase/src/plugins/platforms/cocoa/qiosurfacegraphicsbuffer.h
+--- orig/qtbase/src/plugins/platforms/cocoa/qiosurfacegraphicsbuffer.h	2021-11-23 13:38:08.000000000 -0500
++++ new/qtbase/src/plugins/platforms/cocoa/qiosurfacegraphicsbuffer.h	2021-11-23 13:38:55.000000000 -0500
+@@ -40,6 +40,7 @@
+ #ifndef QIOSURFACEGRAPHICSBUFFER_H
+ #define QIOSURFACEGRAPHICSBUFFER_H
+ 
++#include <CoreGraphics/CGColorSpace.h>
+ #include <qpa/qplatformgraphicsbuffer.h>
+ #include <private/qcore_mac_p.h>
+ 

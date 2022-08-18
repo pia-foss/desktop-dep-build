@@ -1,0 +1,30 @@
+From b2c71acaf110f7aa63e1f4b21fb8fdad2f80e726 Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jhall@londontrustmedia.com>
+Date: Fri, 8 Mar 2019 03:02:48 +0900
+Subject: [PATCH 4/8] Disable non-blocking connect
+
+---
+ src/openvpn/syshead.h | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/openvpn/syshead.h b/src/openvpn/syshead.h
+index 24ee27cc..c4140459 100644
+--- a/src/openvpn/syshead.h
++++ b/src/openvpn/syshead.h
+@@ -628,9 +628,13 @@ socket_defined(const socket_descriptor_t sd)
+ /*
+  * Is non-blocking connect() supported?
+  */
++/* Non-blocking connect has a rubbish poll loop; blocking connect is much faster in practice */
++#undef CONNECT_NONBLOCK
++/*
+ #if defined(HAVE_GETSOCKOPT) && defined(SOL_SOCKET) && defined(SO_ERROR) && defined(EINPROGRESS) && defined(ETIMEDOUT)
+ #define CONNECT_NONBLOCK
+ #endif
++*/
+ 
+ /*
+  * Compression support
+-- 
+2.30.0.windows.2
+

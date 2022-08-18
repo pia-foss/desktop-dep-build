@@ -4,19 +4,6 @@ This repository builds external dependencies for use in PIA Desktop.  The depend
 
 Since this repository uses submodules, make sure to include `--recursive` when cloning it.  If you forgot, `git submodule update --init --recursive` will initialize the submodules.
 
-The component builds were recently moved from separate repositories, and are not fully integrated yet (in particular, OpenSSL is built twice - in the OpenVPN and unbound/hnsd component builds).
-
->>>
-:point_right: **Note:** This repository is replacing the separate dependency build repositories listed below.  An overall build script has been written for Linux, but is still in progress for Windows and Mac.
-
-This repository is used to build PIA Desktop 2.6.1-beta.1, and the separate repositories will be deprecated when this reaches a general release.
-
-* Previous OpenVPN build: https://github.com/pia-foss/desktop-openvpn
-* Previous hnsd/Unbound build: https://github.com/pia-foss/desktop-hnsd
-* Previous Shadowsocks build: https://github.com/pia-foss/desktop-shadowsocks
-* Previous WireGuard and WinTUN build: https://github.com/pia-foss/desktop-wireguard
->>>
-
 # Windows
 
 On Windows, some components build natively using MSVC, while other components build in a MinGW environment.  The Windows build is divided into two parts.
@@ -27,23 +14,40 @@ On Windows, some components build natively using MSVC, while other components bu
 > * Put this repo as close to the filesystem root as possible, such as `C:\wkspc\desktop-dep-build\`.  Some Qt file paths exceed 200 characters and can easily run into file path length limits of Windows or MSVC.
 >   * If you get errors from 7z.exe or cl.exe indicating that files can't be opened, this is usually the cause.
 
-## Natively built components
+## MinGW-built components
 
-This includes OpenVPN (as well as its dependencies, such as OpenSSL) and WireGuard (both the service and WinTUN driver package).
+This includes all dependencies not specifically listed below.
+
+1. Install MSYS2 from https://www.msys2.org - follow the instructions on that page
+2. Install dependencies
+  - You do need to install git in MSYS2, even if you have Git for Windows; it is needed for the submodules.
+  - You do not need libunbound as listed in the hnsd readme, it's built from source.
+  - All builds: `pacman -S base-devel patch git mingw-w64-x86_64-git-lfs`
+  - x86_64 builds: `pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-crt-git`
+  - x86 builds: `pacman -S mingw-w64-i686-toolchain mingw-w64-i686-crt-git`
+  - If prompted by pacman for group members, accept defaults (all members in group)
+3. Set up Git LFS before cloning this repo: `git lfs install`
+4. Make sure you are building from a copy of `desktop-dep-build` cloned by MSYS2.  (Git for Windows handles line endings differently and will cause issues.)
+
+To build:
+
+```
+./build-posix.sh
+```
+
+Build once from the MinGW 64-bit shell to produce 64-bit artifacts, and once from the MinGW 32-bit shell to produce 32-bit artifacts.
+
+## WireGuard
+
+> :point_right: Needs to be updated for latest WinTUN updates
+
+This includes the WireGuard service and WinTUN driver package.
 
 You will need:
 
 * Visual Studio 2019 (any version - build tools is sufficient)
   * Windows SDK 10.0.17763.0 - OpenVPN is currently configured for this specific version of the SDK
-  * ATL/MFC - Qt indirectly references atlbase.h
   * If building on arm64, also get the arm64 compiler, ATL, and MFC from "Individual components"
-* Perl, one of:
-  * Strawberry Perl: http://strawberryperl.com/releases.html
-  * ActiveState Perl: https://www.activestate.com/products/perl/downloads/
-* NASM: https://www.nasm.us
-* 7-zip: https://7-zip.org/
-* Python: https://www.python.org/downloads/
-  * Add Python to PATH in the installer
 * For WinTUN:
   * the brand file used to build PIA (the WinTUN artifact is brand-specific)
   * a SHA256 code-signing certificate (to sign the WinTUN driver package, does not need to be an EV cert)
@@ -60,28 +64,39 @@ The `pia_desktop` repo and brand code (`pia` in the example) are used to find th
 
 This produces artifacts for all supported Windows architectures.
 
-## MinGW-built components
+# macOS
 
-This includes shadowsocks, unbound, and hnsd. (hnsd is no longer supported in PIA but still part of the build for now).
+## Build environment
 
-1. Install MSYS2 from https://www.msys2.org - follow the instructions on that page
-2. Install dependencies
-  - You do need to install git in MSYS2, even if you have Git for Windows; it is needed for the submodules.
-  - You do not need libunbound as listed in the hnsd readme, it's built from source.
-  - All builds: `pacman -S base-devel patch git mingw-w64-x86_64-git-lfs`
-  - x86_64 builds: `pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-crt-git`
-  - x86 builds: `pacman -S mingw-w64-i686-toolchain mingw-w64-i686-crt-git`
-  - If prompted by pacman for group members, accept defaults (all members in group)
-3. Set up Git LFS before cloning this repo: `git lfs install`
-4. Make sure you are building from a copy of `desktop-dep-build` cloned by MSYS2.  (Git for Windows handles line endings differently and will cause issues.)
+You will need:
 
-To build:
+* macOS Big Sur or later host
+* Latest version of Xcode (Command-line tools may work but have not been tested)
+* Homebrew (https://brew.sh)
+* Homebrew packages: `automake autoconf libtool pv llvm pkg-config`
 
-```
-./build-mingw.sh
-```
+Note that Qt is very sensitive to libraries present on the host, it is recommended not to install any other homebrew packages other than the ones specifically needed. (Specifically, many homebrew packages indirectly install libxcb on macOS, which can cause some Qt modules to pick up a dependency on libxcb, even if -no-xcb is passed to Qt's configure script.)
 
-Build once from the MinGW 64-bit shell to produce 64-bit artifacts, and once from the MinGW 32-bit shell to produce 32-bit artifacts.
+>>>
+:point_right: **Note:** Building Qt may take a long time and is best done with at least ~4 CPU cores, ~8 GB RAM, and at least 40 GB free disk space.  Use `./build-posix.sh --skip qt` to skip Qt and only build the other dependencies.
+>>>
+
+## Architectures
+
+Build all dependecies by running the `./build-posix.sh` script in the root directory of the project.
+
+To build universal artifacts, including universal Qt:
+
+1. Build once from an x86_64 host
+2. Build once from an arm64 host
+3. Copy out/macos_<arch> to the same machine (i.e. copy out/macos_x86_64 to the arm64 host or vice versa)
+4. Run `./merge-macos-universal.sh` to merge the artifacts
+
+The combined artifacts are placed in out/macos_universal.  Cross builds are not supported, each build must be performed natively.
+
+Do not run the `./components/*library*/build-posix.sh` scripts.
+Run `./build-posix.sh --build openssl` to build only one library
+Run `./build-posix.sh --skip qt` to build all but one library
 
 # Linux
 
@@ -96,7 +111,7 @@ This build has been tested on:
 Builds are done natively on x86_64, arm64, and armhf, cross builds are not implemented.
 
 >>>
-:point_right: **Note:** Building Qt may take a long time and is best done with at least ~4 CPU cores, ~8 GB RAM, and at least 40 GB free disk space.  Use `./build-linux.sh --no-qt` to skip Qt and only build the other dependencies.  When building Qt, read the notes below.  Make sure your machine has sufficient resources and can handle high CPU load for several hours, especially for embedded ARM devices (use a fan/heatsink).
+:point_right: **Note:** Building Qt may take a long time and is best done with at least ~4 CPU cores, ~8 GB RAM, and at least 40 GB free disk space.  Use `./build-posix.sh --skip qt` to skip Qt and only build the other dependencies.  When building Qt, read the notes below.  Make sure your machine has sufficient resources and can handle high CPU load for several hours, especially for embedded ARM devices (use a fan/heatsink).
 >>>
 
 ## Chroot build
@@ -109,7 +124,7 @@ $ <path>/pia-foss/desktop/scripts/chroot/setup.sh  # use --help to see options, 
 # enter the chroot:
 $ <path>/pia-foss/desktop/scripts/chroot/enter.sh
 # navigate to desktop-dep-build inside the chroot, and build:
-$ ./build-linux.sh
+$ ./build-posix.sh
 ```
 
 ## Host build

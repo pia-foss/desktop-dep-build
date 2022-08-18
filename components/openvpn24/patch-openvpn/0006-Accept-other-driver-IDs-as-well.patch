@@ -1,0 +1,32 @@
+From bc10589cfe999285218b9fb2f7009288f8616de5 Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jhall@londontrustmedia.com>
+Date: Fri, 8 Mar 2019 03:03:42 +0900
+Subject: [PATCH 6/8] Accept other driver IDs as well
+
+---
+ src/openvpn/tun.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/openvpn/tun.c b/src/openvpn/tun.c
+index 512ccbaa..ed6524b3 100644
+--- a/src/openvpn/tun.c
++++ b/src/openvpn/tun.c
+@@ -3858,11 +3858,14 @@ get_tap_reg(struct gc_arena *gc)
+                     /* Is this adapter supported? */
+                     enum windows_driver_type windows_driver = WINDOWS_DRIVER_UNSPECIFIED;
+                     if (strcasecmp(component_id, TAP_WIN_COMPONENT_ID) == 0
++                        || strcasecmp(component_id, "tap-pia-0901") == 0
++                        || strcasecmp(component_id, "root\\tap-pia-0901") == 0
+                         || strcasecmp(component_id, "root\\" TAP_WIN_COMPONENT_ID) == 0)
+                     {
+                         windows_driver = WINDOWS_DRIVER_TAP_WINDOWS6;
+                     }
+-                    else if (strcasecmp(component_id, WINTUN_COMPONENT_ID) == 0)
++                    else if (strcasecmp(component_id, WINTUN_COMPONENT_ID) == 0
++                        || strcasecmp(component_id, "PiaWintun") == 0)
+                     {
+                         windows_driver = WINDOWS_DRIVER_WINTUN;
+                     }
+-- 
+2.30.0.windows.2
+

@@ -1,0 +1,162 @@
+From 5cd371176a16997c25c9e86ee89dd94744fae96a Mon Sep 17 00:00:00 2001
+From: Jonathon Hall <jonathon.hall@privateinternetaccess.com>
+Date: Fri, 28 May 2021 14:14:36 -0400
+Subject: [PATCH 1/3] Rebrand WinTUN driver
+
+---
+ driver/driver.vcxproj |  2 +-
+ driver/wintun.c       |  2 +-
+ driver/wintun.inf     | 56 +++++++++++++++++++++----------------------
+ driver/wintun.rc      | 14 +++++------
+ 4 files changed, 37 insertions(+), 37 deletions(-)
+
+diff --git a/driver/driver.vcxproj b/driver/driver.vcxproj
+index 4457db2..db83701 100644
+--- a/driver/driver.vcxproj
++++ b/driver/driver.vcxproj
+@@ -38,7 +38,7 @@
+     <ProjectGuid>{F7679B65-2FEC-469A-8BAC-B07BF4439422}</ProjectGuid>
+     <RootNamespace>wintun</RootNamespace>
+     <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
+-    <ProjectName>wintun</ProjectName>
++    <ProjectName>pia-wintun</ProjectName>
+   </PropertyGroup>
+   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+   <PropertyGroup Label="Configuration">
+diff --git a/driver/wintun.c b/driver/wintun.c
+index 7cb72bb..009b76f 100644
+--- a/driver/wintun.c
++++ b/driver/wintun.c
+@@ -19,7 +19,7 @@
+ #define NDIS_MINIPORT_VERSION_MIN ((NDIS_MINIPORT_MINIMUM_MAJOR_VERSION << 16) | NDIS_MINIPORT_MINIMUM_MINOR_VERSION)
+ #define NDIS_MINIPORT_VERSION_MAX ((NDIS_MINIPORT_MAJOR_VERSION << 16) | NDIS_MINIPORT_MINOR_VERSION)
+ 
+-#define TUN_VENDOR_NAME "Wintun Tunnel"
++#define TUN_VENDOR_NAME "PIA Wintun Tunnel"
+ #define TUN_VENDOR_ID 0xFFFFFF00
+ #define TUN_LINK_SPEED 100000000000ULL /* 100gbps */
+ 
+diff --git a/driver/wintun.inf b/driver/wintun.inf
+index 9888b06..95e2fe9 100644
+--- a/driver/wintun.inf
++++ b/driver/wintun.inf
+@@ -6,61 +6,61 @@
+ Signature = "$Windows NT$"
+ Class = Net
+ ClassGUID = {4D36E972-E325-11CE-BFC1-08002BE10318}
+-Provider = %Wintun.CompanyName%
+-CatalogFile.NT = wintun.cat
++Provider = %PiaWintun.CompanyName%
++CatalogFile.NT = pia-wintun.cat
+ 
+ [Manufacturer]
+-%Wintun.CompanyName% = %Wintun.Name%, NT$ARCH$
++%PiaWintun.CompanyName% = PiaWintun, NT$ARCH$
+ 
+ [SourceDisksNames]
+-1 = %Wintun.DiskDesc%, "", ,
++1 = %PiaWintun.DiskDesc%, "", ,
+ 
+ [SourceDisksFiles]
+-wintun.sys = 1
++pia-wintun.sys = 1
+ 
+ [DestinationDirs]
+ DefaultDestDir = 12
+-Wintun.CopyFiles.Sys = 12
++PiaWintun.CopyFiles.Sys = 12
+ 
+-[Wintun.CopyFiles.Sys]
+-wintun.sys, , , 0x00004002 ; COPYFLG_IN_USE_RENAME | COPYFLG_NOSKIP
++[PiaWintun.CopyFiles.Sys]
++pia-wintun.sys, , , 0x00004002 ; COPYFLG_IN_USE_RENAME | COPYFLG_NOSKIP
+ 
+-[Wintun.NT$ARCH$]
+-%Wintun.DeviceDesc% = Wintun.Install, Wintun
++[PiaWintun.NT$ARCH$]
++%PiaWintun.DeviceDesc% = PiaWintun.Install, PiaWintun
+ 
+-[Wintun.Install]
++[PiaWintun.Install]
+ Characteristics = 0x1 ; NCF_VIRTUAL
+-AddReg = Wintun.Ndi
+-CopyFiles = Wintun.CopyFiles.Sys
++AddReg = PiaWintun.Ndi
++CopyFiles = PiaWintun.CopyFiles.Sys
+ *IfType = 53 ; IF_TYPE_PROP_VIRTUAL
+ *MediaType = 19 ; NdisMediumIP
+ *PhysicalMediaType = 0 ; NdisPhysicalMediumUnspecified
+ EnableDhcp = 0 ; Disable DHCP
+ 
+-[Wintun.Install.Services]
+-AddService = wintun, 2, Wintun.Service, Wintun.EventLog ; 2=SPSVCINST_ASSOCSERVICE
++[PiaWintun.Install.Services]
++AddService = pia-wintun, 2, PiaWintun.Service, PiaWintun.EventLog ; 2=SPSVCINST_ASSOCSERVICE
+ 
+-[Wintun.Ndi]
+-HKR, , DeviceVxDs, , wintun.sys
+-HKR, Ndi, Service, 0, wintun
++[PiaWintun.Ndi]
++HKR, , DeviceVxDs, , pia-wintun.sys
++HKR, Ndi, Service, 0, pia-wintun
+ HKR, Ndi\Interfaces, UpperRange, , "ndis5"
+ HKR, Ndi\Interfaces, LowerRange, , "nolower"
+ 
+-[Wintun.Service]
+-DisplayName = %Wintun.Name%
+-Description = %Wintun.DeviceDesc%
++[PiaWintun.Service]
++DisplayName = %PiaWintun.Name%
++Description = %PiaWintun.DeviceDesc%
+ ServiceType = 1 ; SERVICE_KERNEL_DRIVER
+ StartType = 3 ; SERVICE_DEMAND_START
+ ErrorControl = 1 ; SERVICE_ERROR_NORMAL
+-ServiceBinary = %12%\wintun.sys
++ServiceBinary = %12%\pia-wintun.sys
+ LoadOrderGroup = NDIS
+ 
+-[Wintun.EventLog]
+-HKR, , EventMessageFile, 0x00020000, "%11%\IoLogMsg.dll;%12%\wintun.sys"
++[PiaWintun.EventLog]
++HKR, , EventMessageFile, 0x00020000, "%11%\IoLogMsg.dll;%12%\pia-wintun.sys"
+ HKR, , TypesSupported, 0x00010001, 7
+ 
+ [Strings]
+-Wintun.Name = "Wintun"
+-Wintun.DiskDesc = "Wintun Driver Install Disk"
+-Wintun.DeviceDesc = "Wintun Userspace Tunnel"
+-Wintun.CompanyName = "WireGuard LLC"
++PiaWintun.Name = "PIA Wintun"
++PiaWintun.DiskDesc = "PIA Wintun Driver Install Disk"
++PiaWintun.DeviceDesc = "PIA Wintun Userspace Tunnel"
++PiaWintun.CompanyName = "Private Internet Access, Inc."
+diff --git a/driver/wintun.rc b/driver/wintun.rc
+index 4b8c580..59efb2c 100644
+--- a/driver/wintun.rc
++++ b/driver/wintun.rc
+@@ -22,15 +22,15 @@ BEGIN
+   BEGIN
+     BLOCK "040904b0"
+     BEGIN
+-      VALUE "CompanyName", "WireGuard LLC"
+-      VALUE "FileDescription", "Wintun Driver"
++      VALUE "CompanyName", "Private Internet Access, Inc."
++      VALUE "FileDescription", "PIA Wintun Driver"
+       VALUE "FileVersion", EXPAND(WINTUN_VERSION)
+-      VALUE "InternalName", "wintun.sys"
+-      VALUE "LegalCopyright", "Copyright \xa9 2018-2021 WireGuard LLC. All Rights Reserved."
+-      VALUE "OriginalFilename", "wintun.sys"
+-      VALUE "ProductName", "Wintun Driver"
++      VALUE "InternalName", "pia-wintun.sys"
++      VALUE "LegalCopyright", "Copyright \xa9 2018-2021 WireGuard LLC. All Rights Reserved. Modifications Copyright \xa9 2021 Private Internet Access, Inc."
++      VALUE "OriginalFilename", "pia-wintun.sys"
++      VALUE "ProductName", "PIA Wintun Driver"
+       VALUE "ProductVersion", EXPAND(WINTUN_VERSION)
+-      VALUE "Comments", "https://www.wintun.net/"
++      VALUE "Comments", ""
+     END
+   END
+   BLOCK "VarFileInfo"
+-- 
+2.31.1.windows.1
+
